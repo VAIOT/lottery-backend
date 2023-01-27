@@ -1,4 +1,4 @@
-import type { BrokerOptions, MetricRegistry, ServiceBroker } from "moleculer";
+import type { BrokerOptions } from "moleculer";
 import { Errors } from "moleculer";
 
 /**
@@ -153,7 +153,19 @@ const brokerConfig: BrokerOptions = {
 	},
 
 	// Enable action & event parameter validation. More info: https://moleculer.services/docs/0.14/validating.html
-	validator: true,
+	validator: {
+		type: "Fastest",
+		options: {
+			useNewCustomCheckerFunction: true,
+			defaults: {},
+			messages: {
+				walletAddress: "The wallet address must start with '0x'!",
+				erc20Required: "Erc20 field is required.",
+				erc721Required: "Erc721 field is required."
+			},
+			aliases: {}
+		}
+	},
 
 	errorHandler: null,
 

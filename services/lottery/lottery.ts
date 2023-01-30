@@ -1,17 +1,17 @@
 import { model, Schema } from "mongoose";
-import { IERC20, IERC721, IMATIC } from "./interfaces/lottery";
-import { ITwitter } from "./interfaces/twitter";
 import { ERC20_TYPE, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from "./enums";
+import type { IERC20, IERC721, IMATIC } from "./interfaces/lottery";
+import type { ITwitter } from "./interfaces/twitter";
+
 
 export type LotteryDTO = (IERC20 | IERC721 | IMATIC) & ITwitter;
 export type LotteryEntity = LotteryDTO & { lottery_end: Date };
 
 type LotterySettings = IERC20 & IERC721 & IMATIC & ITwitter & { lottery_end: Date };
 
-const LotterySchema = new Schema<LotterySettings>({
+const lotterySchema = new Schema<LotterySettings>({
 	id: {
-		type: Number,
-		required: true
+		type: Number
 	},
 	duration: {
 		type: Number,
@@ -19,7 +19,7 @@ const LotterySchema = new Schema<LotterySettings>({
 	},
 	lottery_end: {
 		type: Date,
-		set: function (this: LotterySettings) {
+		set(this: LotterySettings) {
 			const milliseconds = new Date().getTime() + (this.duration * 60 * 60 * 1000);
 			return new Date(milliseconds);
 		}
@@ -89,4 +89,9 @@ const LotterySchema = new Schema<LotterySettings>({
 	timestamps: true
 });
 
-export const Lottery = model<LotterySettings>("Lottery", LotterySchema);
+lotterySchema.pre('save', function(next) {
+	//this.id = set lottery id
+	next();
+});
+
+export const lottery = model<LotterySettings>("Lottery", lotterySchema);

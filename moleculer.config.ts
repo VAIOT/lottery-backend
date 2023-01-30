@@ -164,10 +164,15 @@ const brokerConfig: BrokerOptions = {
 				startsWith: "The '{field}' must start with '{expected}'!"
 			},
 			aliases: {
-				startsWith: { type: 'string', custom(val: string, errors: Array<any>, schema: any, name: any, parent: any, context: any) {
-					if (!val) return
-					if (!val.startsWith(schema.expected)) errors.push({type: "startsWith", expected: schema.expected })
-						return val
+				startsWith: { type: 'string', custom(val: string, errors: any[], schema: any, name: any, parent: any, context: any) {
+					if (!val) {
+						return
+					}
+					if (!val.startsWith(schema.expected)) {
+						errors.push({type: "startsWith", expected: schema.expected })
+					}
+					// eslint-disable-next-line consistent-return
+					return val
 				}
 				}
 			}

@@ -23,10 +23,7 @@ const LotteryService: ServiceSchema = {
 					{ type: "number", positive: true },
 				wallet:
 					{
-						type: "string", max: 42, custom: (val: string, errors: Array<any>) => {
-							if (!val.startsWith("0x")) errors.push({type: "walletAddress"})
-							return val
-						}
+						type: "startsWith", expected: "0x", length: 42
 					},
 				num_of_winners:
 					{ type: "number", integer: true, positive: true },
@@ -55,13 +52,13 @@ const LotteryService: ServiceSchema = {
 							return val
 						}
 					},
-				twitter_like: { type: "string", optional: true },
+				twitter_like: { type: "startsWith", expected: "https://twitter.com/", optional: true },
 				twitter_content: { type: "string", optional: true },
-				twitter_retweet: { type: "string", optional: true },
-				twitter_follow: { type: "string", optional: true },
+				twitter_retweet: { type: "startsWith", expected: "https://twitter.com/", optional: true },
+				twitter_follow: { type: "startsWith", expected: "@", optional: true },
 			},
 			handler(ctx: Context<LotteryDTO>): any {
-				return  ctx.params
+				return ctx.params
 			}
 		},
 		update: {

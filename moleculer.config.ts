@@ -159,11 +159,18 @@ const brokerConfig: BrokerOptions = {
 			useNewCustomCheckerFunction: true,
 			defaults: {},
 			messages: {
-				walletAddress: "The wallet address must start with '0x'!",
-				erc20Required: "Erc20 field is required.",
-				erc721Required: "Erc721 field is required."
+				erc20Required: "The 'Erc20' field is required.",
+				erc721Required: "The 'Erc721' field is required.",
+				startsWith: "The '{field}' must start with '{expected}'!"
 			},
-			aliases: {}
+			aliases: {
+				startsWith: { type: 'string', custom(val: string, errors: Array<any>, schema: any, name: any, parent: any, context: any) {
+					if (!val) return
+					if (!val.startsWith(schema.expected)) errors.push({type: "startsWith", expected: schema.expected })
+						return val
+				}
+				}
+			}
 		}
 	},
 

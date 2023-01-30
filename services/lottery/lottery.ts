@@ -10,7 +10,7 @@ export type LotteryEntity = LotteryDTO & { lottery_end: Date };
 type LotterySettings = IERC20 & IERC721 & IMATIC & ITwitter & { lottery_end: Date };
 
 const lotterySchema = new Schema<LotterySettings>({
-	id: {
+	_id: {
 		type: Number
 	},
 	duration: {
@@ -89,8 +89,20 @@ const lotterySchema = new Schema<LotterySettings>({
 	timestamps: true
 });
 
+lotterySchema.pre('validate', function(next) {
+	const twitterReq: (keyof ITwitter)[] = ["twitter_content", "twitter_follow", "twitter_like", "twitter_retweet"];
+
+	const hasProvider = twitterReq.some((req) => {
+		return Object.prototype.hasOwnProperty.call(this.toObject(), req)
+	});
+	return (hasProvider) ? next() : next(new Error('At least one Twitter requirement should be defined.'));
+});
+
+/**
+ * todo set lottery id
+ * */
 lotterySchema.pre('save', function(next) {
-	//this.id = set lottery id
+	this._id = 1;
 	next();
 });
 

@@ -120,6 +120,8 @@ module.exports = {
 			},
 			// do not enforce format on property names
 			{ selector: "property", format: null },
+			{ selector: "enum", format: ["UPPER_CASE"] },
+			{ selector: "enumMember", format: ["UPPER_CASE"] },
 			// PascalCase for classes and TypeScript keywords
 			{
 				selector: ["typeLike"],

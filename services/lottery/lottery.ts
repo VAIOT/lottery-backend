@@ -56,19 +56,11 @@ const lotterySchema = new Schema<LotterySettings>({
 		],
 	},
 	nfts_choice: {
-		type: Object,
+		type: [{ token_id: Number, contract_address: String }],
 		required: [
 			function(this: IERC721) { return this.asset_choice === TOKEN_TYPE.ERC721 },
 			'nfts_choice is required if asset_choice is ERC721'
-		],
-		token_id: {
-			type: Number,
-			required: true
-		},
-		contract_address: {
-			type: String,
-			required: true
-		}
+		]
 	},
 	twitter: {
 		type: Object,

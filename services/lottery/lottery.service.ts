@@ -4,7 +4,7 @@ import MongooseAdapter from "moleculer-db-adapter-mongoose";
 import { ERC20_TYPE, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from "./enums";
 import type { ITwitter } from "./interfaces/twitter";
 import { lottery } from "./lottery";
-import { hasField } from "./utils"
+import { hasProperty } from "./utils"
 
 const LotteryService: ServiceSchema = {
 	name: "lottery",
@@ -68,7 +68,7 @@ const LotteryService: ServiceSchema = {
 				optional: false,
 				custom: (value: string, errors: any[], schema: any, name: any, parent: any, context: any) => {
 					const twitterReq: (keyof ITwitter)[] = ["content", "follow", "like", "retweet"];
-					if (!hasField(twitterReq, context.data.twitter)) {
+					if (!hasProperty(context.data.twitter, twitterReq)) {
 						errors.push({type: "twitterFieldRequired"})
 					}
 					return value
@@ -80,6 +80,8 @@ const LotteryService: ServiceSchema = {
 			}
 		},
 	},
+
+	dependencies: [],
 
 	actions: {},
 

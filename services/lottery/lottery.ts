@@ -2,7 +2,7 @@ import { model, Schema } from "mongoose";
 import { ERC20_TYPE, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from "./enums";
 import type { IERC20, IERC721, IMATIC } from "./interfaces/lottery";
 import type { ITwitter } from "./interfaces/twitter";
-import { hasField } from "./utils";
+import { hasProperty } from "./utils";
 
 
 export type LotteryDTO = (IERC20 | IERC721 | IMATIC) & { twitter: ITwitter };
@@ -88,7 +88,7 @@ const lotterySchema = new Schema<LotterySettings>({
 
 lotterySchema.pre('validate', function(next) {
 	const twitterReq: (keyof ITwitter)[] = ["content", "follow", "like", "retweet"];
-	if (hasField(twitterReq, this.toObject().twitter)) {
+	if (hasProperty(this.toObject().twitter, twitterReq)) {
 		return next()
 	}
 	return next(new Error('At least one Twitter requirement should be defined.'));

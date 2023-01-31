@@ -20,10 +20,7 @@ const lotterySchema = new Schema<LotterySettings>({
 	},
 	lottery_end: {
 		type: Date,
-		set(this: LotterySettings) {
-			const milliseconds = new Date().getTime() + (this.duration * 60 * 60 * 1000);
-			return new Date(milliseconds);
-		}
+		default: undefined
 	},
 	distribution_method: {
 		type: String,
@@ -57,6 +54,7 @@ const lotterySchema = new Schema<LotterySettings>({
 	},
 	nfts_choice: {
 		type: [{ token_id: Number, contract_address: String }],
+		default: undefined,
 		required: [
 			function(this: IERC721) { return this.asset_choice === TOKEN_TYPE.ERC721 },
 			'nfts_choice is required if asset_choice is ERC721'
@@ -98,7 +96,13 @@ lotterySchema.pre('validate', function(next) {
  * todo set lottery id
  * */
 lotterySchema.pre('save', function(next) {
+	// set lottery id
 	this._id = 1;
+
+	// set lottery end date
+	const milliseconds = new Date().getTime() + (this.duration * 60 * 60 * 1000);
+	this.lottery_end = new Date(milliseconds);
+
 	next();
 });
 

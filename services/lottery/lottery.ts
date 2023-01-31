@@ -2,12 +2,13 @@ import { model, Schema } from "mongoose";
 import { ERC20_TYPE, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from "./enums";
 import type { IERC20, IERC721, IMATIC } from "./interfaces/lottery";
 import type { ITwitter } from "./interfaces/twitter";
+import { hasField } from "./utils";
 
 
-export type LotteryDTO = (IERC20 | IERC721 | IMATIC) & ITwitter;
+export type LotteryDTO = (IERC20 | IERC721 | IMATIC) & { twitter: ITwitter };
 export type LotteryEntity = LotteryDTO & { lottery_end: Date };
 
-type LotterySettings = IERC20 & IERC721 & IMATIC & ITwitter & { lottery_end: Date };
+type LotterySettings = IERC20 & IERC721 & IMATIC & { twitter: ITwitter } & { lottery_end: Date };
 
 const lotterySchema = new Schema<LotterySettings>({
 	_id: {
@@ -69,33 +70,36 @@ const lotterySchema = new Schema<LotterySettings>({
 			required: true
 		}
 	},
-	twitter_like: {
-		type: String,
-		required: false
-	},
-	twitter_content: {
-		type: String,
-		required: false
-	},
-	twitter_retweet: {
-		type: String,
-		required: false
-	},
-	twitter_follow: {
-		type: String,
-		required: false
+	twitter: {
+		type: Object,
+		required: true,
+		like: {
+			type: String,
+			required: false
+		},
+		content: {
+			type: String,
+			required: false
+		},
+		retweet: {
+			type: String,
+			required: false
+		},
+		follow: {
+			type: String,
+			required: false
+		}
 	}
 }, {
 	timestamps: true
 });
 
 lotterySchema.pre('validate', function(next) {
-	const twitterReq: (keyof ITwitter)[] = ["twitter_content", "twitter_follow", "twitter_like", "twitter_retweet"];
-
-	const hasProvider = twitterReq.some((req) => {
-		return Object.prototype.hasOwnProperty.call(this.toObject(), req)
-	});
-	return (hasProvider) ? next() : next(new Error('At least one Twitter requirement should be defined.'));
+	const twitterReq: (keyof ITwitter)[] = ["content", "follow", "like", "retweet"];
+	if (hasField(twitterReq, this.toObject().twitter)) {
+		return next()
+	}
+	return next(new Error('At least one Twitter requirement should be defined.'));
 });
 
 /**

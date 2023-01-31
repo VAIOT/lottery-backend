@@ -161,7 +161,8 @@ const brokerConfig: BrokerOptions = {
 			messages: {
 				erc20Required: "The 'Erc20' field is required.",
 				erc721Required: "The 'Erc721' field is required.",
-				startsWith: "The '{field}' must start with '{expected}'!"
+				startsWith: "The '{field}' must start with '{expected}'!",
+				twitterFieldRequired: "At least one Twitter requirement should be defined."
 			},
 			aliases: {
 				startsWith: { type: 'string', custom(val: string, errors: any[], schema: any, name: any, parent: any, context: any) {
@@ -173,8 +174,7 @@ const brokerConfig: BrokerOptions = {
 					}
 					// eslint-disable-next-line consistent-return
 					return val
-				}
-				}
+				}}
 			}
 		}
 	},

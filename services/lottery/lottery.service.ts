@@ -2,7 +2,9 @@ import type { ServiceSchema } from "moleculer";
 import DbService from "moleculer-db";
 import MongooseAdapter from "moleculer-db-adapter-mongoose";
 import { ERC20_TYPE, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from "./enums";
+import type { ITwitter } from "./interfaces/twitter";
 import { lottery } from "./lottery";
+import { hasField } from "./utils"
 
 const LotteryService: ServiceSchema = {
 	name: "lottery",
@@ -17,7 +19,7 @@ const LotteryService: ServiceSchema = {
 	model: lottery,
 
 	settings: {
-		fields: ["duration", "distribution_method", "number_of_tokens", "num_of_winners", "asset_choice", "twitter_like", "twitter_content", "twitter_retweet", "twitter_follow"],
+		fields: ["duration", "distribution_method", "number_of_tokens", "num_of_winners", "asset_choice", "twitter"],
 
 		entityValidator: {
 			duration:
@@ -61,10 +63,21 @@ const LotteryService: ServiceSchema = {
 						return val
 					}
 				},
-			twitter_like: { type: "string", contains: "twitter.com", optional: true },
-			twitter_content: { type: "string", min: 3, max: 280, optional: true },
-			twitter_retweet: { type: "string", contains: "twitter.com", optional: true },
-			twitter_follow: { type: "startsWith", expected: "@", optional: true },
+			twitter: {
+				type: "object",
+				optional: false,
+				custom: (value: string, errors: any[], schema: any, name: any, parent: any, context: any) => {
+					const twitterReq: (keyof ITwitter)[] = ["content", "follow", "like", "retweet"];
+					if (!hasField(twitterReq, context.data.twitter)) {
+						errors.push({type: "twitterFieldRequired"})
+					}
+					return value
+				},
+				like: {type: "string", contains: "twitter.com/", optional: true},
+				content: {type: "string", min: 3, max: 280, optional: true},
+				retweet: {type: "string", contains: "twitter.com", optional: true},
+				follow: {type: "startsWith", expected: "@", optional: true}
+			}
 		},
 	},
 

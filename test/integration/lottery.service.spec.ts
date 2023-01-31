@@ -21,7 +21,9 @@ describe("Test 'lottery' service", () => {
 			num_of_winners: 3,
 			asset_choice: TOKEN_TYPE.ERC20,
 			erc20_choice: ERC20_TYPE.USDT,
-			twitter_like: "twitter.com/abc"
+			twitter: {
+				like: "twitter.com/abc"
+			}
 		}
 
 		// eslint-disable-next-line @typescript-eslint/naming-convention
@@ -33,8 +35,8 @@ describe("Test 'lottery' service", () => {
 		});
 
 		test("should update an lottery", async () => {
-			const res = await broker.call("v1.lottery.update", { id: 1, twitter_like: "https://twitter.com/bac" });
-			response.twitter_like = "https://twitter.com/bac";
+			const res = await broker.call("v1.lottery.update", { id: 1, twitter: { like: "https://twitter.com/bac" } });
+			response.twitter.like = "https://twitter.com/bac";
 			expect(res).toStrictEqual(response);
 		});
 

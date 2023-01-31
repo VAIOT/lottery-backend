@@ -12,8 +12,8 @@ describe("Test 'lottery' service", () => {
 		beforeAll(() => broker.start());
 		afterAll(() => broker.stop());
 
-		const request: LotteryDTO = {
-			id: 1,
+		const record: LotteryDTO = {
+			_id: 1,
 			duration: 24,
 			distribution_method: TOKEN_DISTRIBUTION_METHOD.SPLIT,
 			number_of_tokens: 30,
@@ -21,17 +21,26 @@ describe("Test 'lottery' service", () => {
 			num_of_winners: 3,
 			asset_choice: TOKEN_TYPE.ERC20,
 			erc20_choice: ERC20_TYPE.USDT,
-			twitter_like: "https://twitter.com/abc"
+			twitter_like: "twitter.com/abc"
 		}
 
+		// eslint-disable-next-line @typescript-eslint/naming-convention
+		const response = (({ _id, erc20_choice, wallet, ...res }) => res)(record)
+
 		test("should add the new lottery", async () => {
-			const res = await broker.call("v1.lottery.create", request);
-			expect(res).toBe(true);
+			const res = await broker.call("v1.lottery.create", record);
+			expect(res).toStrictEqual(response);
 		});
 
 		test("should update an lottery", async () => {
 			const res = await broker.call("v1.lottery.update", { id: 1, twitter_like: "https://twitter.com/bac" });
-			expect(res).toBe(true);
+			response.twitter_like = "https://twitter.com/bac";
+			expect(res).toStrictEqual(response);
+		});
+
+		test("should remove lottery", async () => {
+			const res = await broker.call("v1.lottery.remove", { id: record._id});
+			expect(res).toStrictEqual(response);
 		});
 	});
 });

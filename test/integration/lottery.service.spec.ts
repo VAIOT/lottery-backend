@@ -2,12 +2,14 @@ import { ServiceBroker } from "moleculer";
 import brokerConfig from "../../moleculer.config"
 import { ERC20_TYPE, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from "../../services/lottery/enums";
 import type { LotteryDTO } from "../../services/lottery/lottery";
-import TestService from "../../services/lottery/lottery.service";
+import LotteryService from "../../services/lottery/lottery.service";
+import SocialService from "../../services/social/social.service";
 
 describe("Test 'lottery' service", () => {
 	describe("Test actions", () => {
 		const broker = new ServiceBroker(brokerConfig);
-		broker.createService(TestService);
+		broker.createService(SocialService);
+		broker.createService(LotteryService);
 
 		beforeAll(() => broker.start());
 		afterAll(() => broker.stop());

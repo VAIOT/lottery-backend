@@ -48,7 +48,8 @@
     "moleculer": "^0.14.27",
     "moleculer-db": "^0.8.21",
     "moleculer-db-adapter-mongoose": "^0.9.1",
-    "mongoose": "^6.9.0"
+    "mongoose": "^6.9.0",
+    "twit": "^2.2.11"
   },
   "engines": {
     "node": ">= 16.x.x"

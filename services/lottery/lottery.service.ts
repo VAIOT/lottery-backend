@@ -11,9 +11,9 @@ const LotteryService: ServiceSchema = {
 	version: 1,
 
 	mixins: [DbService],
-	adapter: new MongooseAdapter("mongodb+srv://mongo.mongodb.net", {
-		user: "user",
-		pass: "pass",
+	adapter: new MongooseAdapter("mongodb+srv://cluster0.pd5fxn9.mongodb.net", {
+		user: process.env.MONGO_USER,
+		pass: process.env.MONGO_PASS,
 		keepAlive: true
 	}),
 	model: lottery,
@@ -81,7 +81,9 @@ const LotteryService: ServiceSchema = {
 		},
 	},
 
-	dependencies: [],
+	dependencies: [
+		{ name: "social", version: 1 }
+	],
 
 	actions: {},
 
@@ -103,12 +105,14 @@ const LotteryService: ServiceSchema = {
 	/**
 	 * Service started lifecycle event handler
 	 */
-	async started() {},
+	async started() {
+		// todo iterate through lotteries in db and retrieve end time.
+	},
 
 	/**
 	 * Service stopped lifecycle event handler
 	 */
-	async stopped() {},
+	async stopped() {}
 }
 
 export default LotteryService;

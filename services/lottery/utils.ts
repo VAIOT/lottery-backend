@@ -9,8 +9,7 @@
  * @returns boolean
  * */
 function hasProperty<T, V extends T & PropertyKey>(object: T, properties: V[]): boolean {
-	return properties.some((prop: V) => Object.prototype.hasOwnProperty.call(object, prop)
-	)
+	return (object) ? properties?.some((prop: V) => Object.prototype.hasOwnProperty.call(object, prop)) : false
 }
 
 export { hasProperty }

@@ -16,6 +16,7 @@ export interface IERC20 extends ILotteryBase {
 
 export interface IERC721 extends ILotteryBase {
 	nfts_choice: {
+		name: string,
 		token_id: number,
 		contract_address: string
 	}[];

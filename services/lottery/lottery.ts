@@ -53,7 +53,7 @@ const lotterySchema = new Schema<LotterySettings>({
 		],
 	},
 	nfts_choice: {
-		type: [{ token_id: Number, contract_address: String }],
+		type: [{ name: String, token_id: Number, contract_address: String }],
 		default: undefined,
 		required: [
 			function(this: IERC721) { return this.asset_choice === TOKEN_TYPE.ERC721 },

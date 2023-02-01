@@ -29,11 +29,13 @@ const lotterySchema = new Schema<LotterySettings>({
 	},
 	distribution_options: {
 		type: [Number],
-		required: false
+		required: false,
+		default: undefined
 	},
 	number_of_tokens: {
 		type: Number,
-		required: false
+		required: false,
+		default: undefined
 	},
 	wallet: {
 		type: String,
@@ -106,7 +108,7 @@ lotterySchema.pre('validate', function(next) {
  * */
 lotterySchema.pre('save', function(next) {
 	// set lottery id
-	this._id = 1;
+	this._id = 2;
 
 	// set lottery end date
 	const milliseconds = new Date().getTime() + (this.duration * 60 * 60 * 1000);

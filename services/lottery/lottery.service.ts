@@ -27,9 +27,42 @@ const LotteryService: ServiceSchema = {
 			distribution_method:
 				{ type: "enum", values: Object.values(TOKEN_DISTRIBUTION_METHOD) },
 			distribution_options:
-				{ type: "array", optional: true }, // todo sum validation (100) / if !nft
+				{
+					type: "array",
+					items: {
+						type: "number",
+						positive: true
+					},
+					optional: true,
+					custom: (value: number[], errors: any[], schema: any, name: any, parent: any, context: any): (number[] | undefined) => {
+						if (context.data.asset_choice !== TOKEN_TYPE.ERC721) {
+							if (value) {
+								if (value.reduce((sum, val) => sum + val, 0) === 100) {
+									return value
+								}
+								errors.push({type: "numberEqual", expected: 100 });
+							} else {
+								errors.push({type: "required"});
+							}
+						}
+						return undefined;
+					}
+				},
 			number_of_tokens:
-				{ type: "number", positive: true, optional: true }, // todo if !nft
+				{
+					type: "number",
+					positive: true,
+					optional: true,
+					custom: (value: number, errors: any[], schema: any, name: any, parent: any, context: any): (number | undefined) => {
+						if (context.data.asset_choice !== TOKEN_TYPE.ERC721) {
+							if (value) {
+								return value;
+							}
+							errors.push({type: "required"});
+						}
+						return undefined;
+					}
+				},
 			wallet:
 				{ type: "startsWith", expected: "0x", length: 42 },
 			num_of_winners:
@@ -41,44 +74,54 @@ const LotteryService: ServiceSchema = {
 					type: "enum",
 					values: Object.values(ERC20_TYPE),
 					optional: true,
-					custom: (val: string, errors: any[], schema: any, name: any, parent: any, context: any) => {
-						if (context.data.asset_choice === TOKEN_TYPE.ERC20 && val === undefined) {
-							errors.push({type: "erc20Required"})
+					custom: (value: string, errors: any[], schema: any, name: any, parent: any, context: any): (string | undefined)  => {
+						if (context.data.asset_choice === TOKEN_TYPE.ERC20) {
+							if (value) {
+								return value;
+							}
+							errors.push({type: "required"});
 						}
-						return val
+						return undefined;
 					}
 				},
 			nfts_choice:
 				{
 					type: "array",
-					values: [{
-						name: { type: "string" },
-						token_id: { type: "number", integer: true, positive: true },
-						contract_address: { type: "string" }
-					}],
-					optional: true,
-					custom: (val: string, errors: any[], schema: any, name: any, parent: any, context: any) => {
-						if (context.data.asset_choice === TOKEN_TYPE.ERC721 && val === undefined) {
-							errors.push({type: "erc721Required"})
+					items: {
+						type: "object",
+						props: {
+							name: { type: "string" },
+							token_id: { type: "number", integer: true, positive: true },
+							contract_address: { type: "string", required: true }
 						}
-						return val
+					},
+					optional: true,
+					custom: (value: object[], errors: any[], schema: any, name: any, parent: any, context: any): (object[] | undefined) => {
+						if (context.data.asset_choice === TOKEN_TYPE.ERC721) {
+							if (value) {
+								return value;
+							}
+							errors.push({type: "required"});
+						}
+						return undefined;
 					}
 				},
 			twitter: {
 				type: "object",
 				optional: false,
-				custom: (value: string, errors: any[], schema: any, name: any, parent: any, context: any) => {
+				custom: (value: object, errors: any[], schema: any, name: any, parent: any, context: any): object => {
 					const twitterReq: (keyof ITwitter)[] = ["content", "follow", "like", "retweet"];
 					if (!hasProperty(context.data.twitter, twitterReq)) {
-						errors.push({type: "twitterFieldRequired"})
+						errors.push({type: "twitterFieldRequired"});
 					}
-					return value
+					return value;
 				},
 				like: { type: "string", contains: "twitter.com/", optional: true },
 				content: { type: "string", min: 3, max: 280, optional: true },
 				retweet: { type: "string", contains: "twitter.com/", optional: true },
-				follow: { type: "startsWith", expected: "@", optional: true }
-			}
+				follow: { type: "startsWith", expected: "@", optional: true },
+			},
+			$$strict: "remove"
 		}
 	},
 

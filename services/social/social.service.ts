@@ -1,4 +1,4 @@
-import type { ServiceSchema } from "moleculer";
+import type { Context, ServiceSchema } from "moleculer";
 
 const SocialService: ServiceSchema = {
 	name: "social",
@@ -7,7 +7,50 @@ const SocialService: ServiceSchema = {
 	settings: {},
 
 	actions: {
+		likes: {
+			visibility: "protected", // can be called only locally (from local services)
+			params: {
+				postUrl: "string",
+				from: "date",
+				to: "date"
+			},
+			handler(ctx: Context) {
 
+			}
+		},
+		retweets: {
+			visibility: "protected", // can be called only locally (from local services)
+			params: {
+				postUrl: "string",
+				from: "date",
+				to: "date"
+			},
+			handler(ctx: Context) {
+
+			}
+		},
+		follows: {
+			visibility: "protected", // can be called only locally (from local services)
+			params: {
+				account: "string",
+				from: "date",
+				to: "date"
+			},
+			handler(ctx: Context) {
+
+			}
+		},
+		posts: {
+			visibility: "protected", // can be called only locally (from local services)
+			params: {
+				content: "string",
+				from: "date",
+				to: "date"
+			},
+			handler(ctx: Context) {
+
+			}
+		}
 	},
 
 	/**
@@ -19,16 +62,10 @@ const SocialService: ServiceSchema = {
 	 * Methods
 	 */
 	methods: {
-		getLikes(postUrl: string, from: Date, to: Date) {
+		getWallets() {
 
 		},
-		findPosts(content: string, from: Date, to: Date) {
-
-		},
-		getRetweets(postUrl: string, from: Date, to: Date) {
-
-		},
-		getFollows(accountName: string, from: Date, to: Date) {
+		filterBots() {
 
 		}
 	},

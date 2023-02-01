@@ -27,9 +27,9 @@ const LotteryService: ServiceSchema = {
 			distribution_method:
 				{ type: "enum", values: Object.values(TOKEN_DISTRIBUTION_METHOD) },
 			distribution_options:
-				{ type: "array" },
+				{ type: "array", optional: true }, // todo sum validation (100) / if !nft
 			number_of_tokens:
-				{ type: "number", positive: true },
+				{ type: "number", positive: true, optional: true }, // todo if !nft
 			wallet:
 				{ type: "startsWith", expected: "0x", length: 42 },
 			num_of_winners:
@@ -76,7 +76,7 @@ const LotteryService: ServiceSchema = {
 				},
 				like: { type: "string", contains: "twitter.com/", optional: true },
 				content: { type: "string", min: 3, max: 280, optional: true },
-				retweet: { type: "string", contains: "twitter.com", optional: true },
+				retweet: { type: "string", contains: "twitter.com/", optional: true },
 				follow: { type: "startsWith", expected: "@", optional: true }
 			}
 		}

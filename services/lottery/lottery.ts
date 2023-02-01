@@ -29,11 +29,11 @@ const lotterySchema = new Schema<LotterySettings>({
 	},
 	distribution_options: {
 		type: [Number],
-		required: true
+		required: false
 	},
 	number_of_tokens: {
 		type: Number,
-		required: true
+		required: false
 	},
 	wallet: {
 		type: String,
@@ -51,6 +51,7 @@ const lotterySchema = new Schema<LotterySettings>({
 	erc20_choice: {
 		type: String,
 		enum: ERC20_TYPE,
+		default: undefined,
 		required: [
 			function(this: IERC20) { return this.asset_choice === TOKEN_TYPE.ERC20 },
 			'erc20_choice is required if asset_choice is ERC20'
@@ -69,19 +70,23 @@ const lotterySchema = new Schema<LotterySettings>({
 		required: true,
 		like: {
 			type: String,
-			required: false
+			required: false,
+			default: undefined
 		},
 		content: {
 			type: String,
-			required: false
+			required: false,
+			default: undefined
 		},
 		retweet: {
 			type: String,
-			required: false
+			required: false,
+			default: undefined
 		},
 		follow: {
 			type: String,
-			required: false
+			required: false,
+			default: undefined
 		}
 	}
 }, {

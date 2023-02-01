@@ -27,6 +27,10 @@ const lotterySchema = new Schema<LotterySettings>({
 		enum: TOKEN_DISTRIBUTION_METHOD,
 		required: true
 	},
+	distribution_options: {
+		type: [Number],
+		required: true
+	},
 	number_of_tokens: {
 		type: Number,
 		required: true

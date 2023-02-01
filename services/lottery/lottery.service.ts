@@ -26,6 +26,8 @@ const LotteryService: ServiceSchema = {
 				{ type: "number", integer: true, positive: true },
 			distribution_method:
 				{ type: "enum", values: Object.values(TOKEN_DISTRIBUTION_METHOD) },
+			distribution_options:
+				{ type: "array" },
 			number_of_tokens:
 				{ type: "number", positive: true },
 			wallet:

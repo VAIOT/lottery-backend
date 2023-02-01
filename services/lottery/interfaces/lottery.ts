@@ -4,6 +4,7 @@ interface ILotteryBase {
 	_id?: number;
 	duration: number;
 	distribution_method: TOKEN_DISTRIBUTION_METHOD;
+	distribution_options: number[];
 	number_of_tokens: number;
 	wallet: string;
 	num_of_winners: number;

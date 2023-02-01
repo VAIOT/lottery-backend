@@ -29,9 +29,7 @@ const LotteryService: ServiceSchema = {
 			number_of_tokens:
 				{ type: "number", positive: true },
 			wallet:
-				{
-					type: "startsWith", expected: "0x", length: 42
-				},
+				{ type: "startsWith", expected: "0x", length: 42 },
 			num_of_winners:
 				{ type: "number", integer: true, positive: true },
 			asset_choice:
@@ -46,15 +44,16 @@ const LotteryService: ServiceSchema = {
 							errors.push({type: "erc20Required"})
 						}
 						return val
-					},
+					}
 				},
 			nfts_choice:
 				{
-					type: "object",
-					values: {
+					type: "array",
+					values: [{
+						name: { type: "string" },
 						token_id: { type: "number", integer: true, positive: true },
 						contract_address: { type: "string" }
-					},
+					}],
 					optional: true,
 					custom: (val: string, errors: any[], schema: any, name: any, parent: any, context: any) => {
 						if (context.data.asset_choice === TOKEN_TYPE.ERC721 && val === undefined) {
@@ -73,12 +72,12 @@ const LotteryService: ServiceSchema = {
 					}
 					return value
 				},
-				like: {type: "string", contains: "twitter.com/", optional: true},
-				content: {type: "string", min: 3, max: 280, optional: true},
-				retweet: {type: "string", contains: "twitter.com", optional: true},
-				follow: {type: "startsWith", expected: "@", optional: true}
+				like: { type: "string", contains: "twitter.com/", optional: true },
+				content: { type: "string", min: 3, max: 280, optional: true },
+				retweet: { type: "string", contains: "twitter.com", optional: true },
+				follow: { type: "startsWith", expected: "@", optional: true }
 			}
-		},
+		}
 	},
 
 	dependencies: [

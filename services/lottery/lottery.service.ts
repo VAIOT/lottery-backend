@@ -6,6 +6,13 @@ import type { ITwitter } from "./interfaces/twitter";
 import { lottery } from "./lottery";
 import { hasProperty } from "./utils"
 
+const regex = {
+	twitter: {
+		post: "^(http(s)?:\\/\\/)?twitter\\.com\\/(?:#!\\/)?(\\w+)\\/status(es)?\\/(\\d+)$",
+		username: "^@(\\w{1,15})$",
+	}
+}
+
 const LotteryService: ServiceSchema = {
 	name: "lottery",
 	version: 1,
@@ -116,10 +123,20 @@ const LotteryService: ServiceSchema = {
 					}
 					return value;
 				},
-				like: { type: "string", contains: "twitter.com/", optional: true },
-				content: { type: "string", min: 3, max: 280, optional: true },
-				retweet: { type: "string", contains: "twitter.com/", optional: true },
-				follow: { type: "string", pattern: "^@?(\\w){1,15}$", optional: true },
+				props: {
+					like: {
+						type: "string",
+						pattern: regex.twitter.post,
+						optional: true
+					},
+					content: { type: "string", min: 3, max: 280, optional: true },
+					retweet: {
+						type: "string",
+						pattern: regex.twitter.post,
+						optional: true
+					},
+					follow: { type: "string", pattern: regex.twitter.username, optional: true }
+				}
 			},
 			$$strict: "remove"
 		}

@@ -1,4 +1,6 @@
 import type { Context, ServiceSchema } from "moleculer";
+import type { Account, Post, PostContent } from "./interfaces/twitter";
+import { twitter } from "./socials";
 
 const SocialService: ServiceSchema = {
 	name: "social",
@@ -8,47 +10,59 @@ const SocialService: ServiceSchema = {
 
 	actions: {
 		likes: {
-			visibility: "protected", // can be called only locally (from local services)
+			visibility: "protected",
 			params: {
 				postUrl: "string",
-				from: "date",
-				to: "date"
+				date_from: "date",
+				date_to: "date"
 			},
-			handler(ctx: Context) {
-
+			async handler(ctx: Context<Post>) {
+				const data = ctx.params;
+				await twitter.likes(data.postUrl)
 			}
 		},
 		retweets: {
-			visibility: "protected", // can be called only locally (from local services)
+			visibility: "protected",
 			params: {
 				postUrl: "string",
-				from: "date",
-				to: "date"
+				date_from: "date",
+				date_to: "date"
 			},
-			handler(ctx: Context) {
-
+			async handler(ctx: Context<Post>) {
+				const data = ctx.params;
+				await twitter.retweets(data.postUrl)
 			}
 		},
-		follows: {
-			visibility: "protected", // can be called only locally (from local services)
+		followers: {
+			visibility: "protected",
 			params: {
 				account: "string",
-				from: "date",
-				to: "date"
+				date_from: "date",
+				date_to: "date"
 			},
-			handler(ctx: Context) {
-
+			async handler(ctx: Context<Account>) {
+				const data = ctx.params;
+				await twitter.followers(data.account)
+				// get all followers before and save to db (id: account, followers: ...)
+				// after x time compare followers
 			}
 		},
-		posts: {
-			visibility: "protected", // can be called only locally (from local services)
+		content: {
+			visibility: "protected",
 			params: {
 				content: "string",
-				from: "date",
-				to: "date"
+				date_from: "date",
+				date_to: "date"
 			},
-			handler(ctx: Context) {
+			async handler(ctx: Context<PostContent>): Promise<string[]> {
+				const data = ctx.params;
+				const wallets: string[] = [];
 
+				const posts = await twitter.postsWithContent(data.content, data.date_from, data.date_to);
+				for await (const post of posts) {
+					wallets.push(this.findWallet(post.text));
+				}
+				return wallets;
 			}
 		}
 	},
@@ -62,11 +76,8 @@ const SocialService: ServiceSchema = {
 	 * Methods
 	 */
 	methods: {
-		getWallets() {
-
-		},
-		filterBots() {
-
+		findWallet(content: string): string {
+			return content; // TODO implementation
 		}
 	},
 

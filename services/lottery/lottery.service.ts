@@ -119,7 +119,7 @@ const LotteryService: ServiceSchema = {
 				like: { type: "string", contains: "twitter.com/", optional: true },
 				content: { type: "string", min: 3, max: 280, optional: true },
 				retweet: { type: "string", contains: "twitter.com/", optional: true },
-				follow: { type: "startsWith", expected: "@", optional: true },
+				follow: { type: "string", pattern: "^@?(\\w){1,15}$", optional: true },
 			},
 			$$strict: "remove"
 		}

@@ -6,9 +6,9 @@ import { hasProperty } from "./utils";
 
 
 export type LotteryDTO = (IERC20 | IERC721 | IMATIC) & { twitter: ITwitter };
-export type LotteryEntity = LotteryDTO & { lottery_end: Date };
+export type LotteryEntity = LotteryDTO & { lottery_end: Date, fees_amount: number };
 
-type LotterySettings = IERC20 & IERC721 & IMATIC & { twitter: ITwitter } & { lottery_end: Date };
+type LotterySettings = IERC20 & IERC721 & IMATIC & { twitter: ITwitter, lottery_end: Date, fees_amount: number };
 
 const lotterySchema = new Schema<LotterySettings>({
 	_id: {
@@ -36,6 +36,9 @@ const lotterySchema = new Schema<LotterySettings>({
 		type: Number,
 		required: false,
 		default: undefined
+	},
+	fees_amount: {
+		type: Number,
 	},
 	wallet: {
 		type: String,
@@ -109,6 +112,8 @@ lotterySchema.pre('validate', function(next) {
 lotterySchema.pre('save', function(next) {
 	// set lottery id
 	this._id = 2;
+	// set fees_amount
+	this.fees_amount = 10
 
 	// set lottery end date
 	const milliseconds = new Date().getTime() + (this.duration * 60 * 60 * 1000);

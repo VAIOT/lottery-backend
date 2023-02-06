@@ -12,39 +12,38 @@ const SocialService: ServiceSchema = {
 		likes: {
 			visibility: "protected",
 			params: {
-				postUrl: "string",
+				post_url: "string",
 				date_from: "date",
 				date_to: "date"
 			},
 			async handler(ctx: Context<Post>) {
 				const data = ctx.params;
-				await twitter.likes(data.postUrl)
+				return twitter.likes(data.post_url);
 			}
 		},
 		retweets: {
 			visibility: "protected",
 			params: {
-				postUrl: "string",
+				post_url: "string",
 				date_from: "date",
 				date_to: "date"
 			},
 			async handler(ctx: Context<Post>) {
 				const data = ctx.params;
-				await twitter.retweets(data.postUrl)
+				await twitter.retweets(data.post_url);
 			}
 		},
 		followers: {
 			visibility: "protected",
 			params: {
-				account: "string",
+				user: "string",
+				post_url: "string",
 				date_from: "date",
 				date_to: "date"
 			},
 			async handler(ctx: Context<Account>) {
 				const data = ctx.params;
-				await twitter.followers(data.account)
-				// get all followers before and save to db (id: account, followers: ...)
-				// after x time compare followers
+				await twitter.followers(data.user, data.post_url);
 			}
 		},
 		content: {
@@ -59,8 +58,10 @@ const SocialService: ServiceSchema = {
 				const wallets: string[] = [];
 
 				const posts = await twitter.postsWithContent(data.content, data.date_from, data.date_to);
-				for await (const post of posts) {
-					wallets.push(this.findWallet(post.text));
+				if (posts.data) {
+					for await (const post of posts.data) {
+						wallets.push(this.getWallet(post.text));
+					}
 				}
 				return wallets;
 			}
@@ -76,7 +77,7 @@ const SocialService: ServiceSchema = {
 	 * Methods
 	 */
 	methods: {
-		findWallet(content: string): string {
+		getWallet(content: string): string {
 			return content; // TODO implementation
 		}
 	},

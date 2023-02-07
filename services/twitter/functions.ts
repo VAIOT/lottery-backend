@@ -27,14 +27,13 @@ async function getConversationID(postUrl: string): Promise<string> {
 		} 
 		throw new Errors.MoleculerError("Twitter api error.", 422, "ERR_TWITTER", {error: { message: "Conversation_id is missing"}, response: tweet});
 	} catch(error) {
-		throw new Errors.MoleculerError("Twitter api error.", 422, "ERR_TWITTER", error);
+		throw new Errors.MoleculerError("Twitter api error.", error.code, "ERR_TWITTER", error);
 	}
 }
 
 async function getUserID(user: string): Promise<string> {
 	return (await readOnlyClient.v2.userByUsername(user.substring(1, user.length))).data.id;
 }
-
 
 export async function likes(postUrl: string, logger: Moleculer.LoggerInstance): Promise<TwitterDTO> {
 	let paginatedResponses: TweetSearchRecentV2Paginator;
@@ -44,7 +43,7 @@ export async function likes(postUrl: string, logger: Moleculer.LoggerInstance): 
 		// fetch tweet responses with conversation_id
 		paginatedResponses = await client.v2.search(`conversation_id:${await getConversationID(postUrl)}`, { "tweet.fields": ["author_id"]});
 	} catch(error) {
-		throw new Errors.MoleculerError("Twitter api error.", 422, "ERR_TWITTER", error);
+		throw new Errors.MoleculerError("Twitter api error.", error.code, "ERR_TWITTER", error);
 	}
 
 	if (paginatedResponses.unusable) {
@@ -61,7 +60,7 @@ export async function likes(postUrl: string, logger: Moleculer.LoggerInstance): 
 					// TODO save to the db
 					break;
 				} else {
-					throw new Errors.MoleculerError("Twitter service error.", 422, "ERR_TWITTER_SERVICE", error);
+					throw new Errors.MoleculerError("Twitter service error.", error.code, "ERR_TWITTER_SERVICE", error);
 				}
 			}
 		}
@@ -71,7 +70,7 @@ export async function likes(postUrl: string, logger: Moleculer.LoggerInstance): 
 		// fetch likes
 		paginatedLikes = await readOnlyClient.v2.tweetLikedBy(getPostId(postUrl), { asPaginator: true });
 	} catch(error) {
-		throw new Errors.MoleculerError("Twitter api error.", 422, "ERR_TWITTER", error);
+		throw new Errors.MoleculerError("Twitter api error.", error.code, "ERR_TWITTER", error);
 	}
 
 	if (paginatedLikes.unusable) {
@@ -88,7 +87,7 @@ export async function likes(postUrl: string, logger: Moleculer.LoggerInstance): 
 					// TODO save to the db
 					break;
 				} else {
-					throw new Errors.MoleculerError("Twitter service error.", 422, "ERR_TWITTER_SERVICE", error);
+					throw new Errors.MoleculerError("Twitter service error.", error.code, "ERR_TWITTER_SERVICE", error);
 				}
 			}
 		}
@@ -112,7 +111,7 @@ export async function retweets(url: string, logger: Moleculer.LoggerInstance): P
 	try {
 		paginatedRetweets = await client.v2.search(`url:${getPostId(url)}`, { "tweet.fields": ["author_id"]});
 	} catch(error) {
-		throw new Errors.MoleculerError("Twitter api error.", 422, "ERR_TWITTER", error);
+		throw new Errors.MoleculerError("Twitter api error.", error.code, "ERR_TWITTER", error);
 	}
 	
 	
@@ -130,7 +129,7 @@ export async function retweets(url: string, logger: Moleculer.LoggerInstance): P
 					// TODO save to the db
 					break;
 				} else {
-					throw new Errors.MoleculerError("Twitter service error.", 422, "ERR_TWITTER_SERVICE", error);
+					throw new Errors.MoleculerError("Twitter service error.", error.code, "ERR_TWITTER_SERVICE", error);
 				}
 			}
 		}
@@ -150,7 +149,7 @@ export async function postsWithContent(content: string, dateFrom: Date, logger: 
 	try {
 		paginatedSearch = await readOnlyClient.v2.search(content, { start_time: dateFrom.toISOString(), "tweet.fields": ["author_id"] });
 	} catch(error) {
-		throw new Errors.MoleculerError("Twitter api error.", 422, "ERR_TWITTER", error);
+		throw new Errors.MoleculerError("Twitter api error.", error.code, "ERR_TWITTER", error);
 	}
 
 	if (paginatedSearch.unusable) {
@@ -167,7 +166,7 @@ export async function postsWithContent(content: string, dateFrom: Date, logger: 
 					// TODO save to the db
 					break;
 				} else {
-					throw new Errors.MoleculerError("Twitter service error.", 422, "ERR_TWITTER_SERVICE", error);
+					throw new Errors.MoleculerError("Twitter service error.", error.code, "ERR_TWITTER_SERVICE", error);
 				}
 			}
 		}
@@ -190,7 +189,7 @@ export async function followers(user: string, postUrl: string, logger: Moleculer
 		// fetch tweet responses with conversation_id
 		tweetResponses = await client.v2.search(`conversation_id:${await getConversationID(postUrl)}`, { "tweet.fields": ["author_id"]});
 	} catch(error) {
-		throw new Errors.MoleculerError("Twitter api error.", 422, "ERR_TWITTER", error);
+		throw new Errors.MoleculerError("Twitter api error.", error.code, "ERR_TWITTER", error);
 	}
 
 	if (tweetResponses.unusable) {
@@ -207,7 +206,7 @@ export async function followers(user: string, postUrl: string, logger: Moleculer
 					// TODO save to the db
 					break;
 				} else {
-					throw new Errors.MoleculerError("Twitter service error.", 422, "ERR_TWITTER_SERVICE", error);
+					throw new Errors.MoleculerError("Twitter service error.", error.code, "ERR_TWITTER_SERVICE", error);
 				}
 			}
 		}
@@ -216,7 +215,7 @@ export async function followers(user: string, postUrl: string, logger: Moleculer
 	try {
 		paginatedFollowers = await readOnlyClient.v2.followers(await getUserID(user), { asPaginator: true });
 	} catch(error) {
-		throw new Errors.MoleculerError("Twitter api error.", 422, "ERR_TWITTER", error);
+		throw new Errors.MoleculerError("Twitter api error.", error.code, "ERR_TWITTER", error);
 	}
 
 	if (paginatedFollowers.unusable) {
@@ -233,7 +232,7 @@ export async function followers(user: string, postUrl: string, logger: Moleculer
 					// TODO save to the db
 					break;
 				} else {
-					throw new Errors.MoleculerError("Twitter service error.", 422, "ERR_TWITTER_SERVICE", error);
+					throw new Errors.MoleculerError("Twitter service error.", error.code, "ERR_TWITTER_SERVICE", error);
 				}
 			}
 		}

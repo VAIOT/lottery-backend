@@ -18,7 +18,7 @@ const LotteryService: ServiceSchema = {
 	version: 1,
 
 	mixins: [DbService],
-	adapter: new MongooseAdapter("mongodb+srv://cluster0.pd5fxn9.mongodb.net", {
+	adapter: new MongooseAdapter(process.env.MONGO_URI!, {
 		user: process.env.MONGO_USER,
 		pass: process.env.MONGO_PASS,
 		keepAlive: true
@@ -143,7 +143,7 @@ const LotteryService: ServiceSchema = {
 	},
 
 	dependencies: [
-		{ name: "social", version: 1 }
+		{ name: "twitter", version: 1 }
 	],
 
 	actions: {},

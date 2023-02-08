@@ -18,7 +18,7 @@ const LotteryService: ServiceSchema = {
 	version: 1,
 
 	mixins: [DbService],
-	adapter: new MongooseAdapter(process.env.MONGO_URI!, {
+	adapter: new MongooseAdapter(`mongodb+srv://${process.env.MONGO_URI}`, {
 		user: process.env.MONGO_USER,
 		pass: process.env.MONGO_PASS,
 		keepAlive: true
@@ -42,7 +42,7 @@ const LotteryService: ServiceSchema = {
 					},
 					optional: true,
 					custom: (value: number[], errors: any[], schema: any, name: any, parent: any, context: any): (number[] | undefined) => {
-						if (context.data.asset_choice !== TOKEN_TYPE.ERC721) {
+						if (context.data.asset_choice !== TOKEN_TYPE.ERC721 && context.data.distribution_method === TOKEN_DISTRIBUTION_METHOD.PERCENTAGE) {
 							if (value) {
 								if (value.reduce((sum, val) => sum + val, 0) === 100) {
 									return value

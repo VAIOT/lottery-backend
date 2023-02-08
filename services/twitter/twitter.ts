@@ -3,27 +3,31 @@ import type { TweetLikingUsersV2Paginator, TweetSearchRecentV2Paginator, UserFol
 import { ACTION } from "./enums";
 
 type TwitterSettings = { 
-	action_type: ACTION,
-	action_id: string,
-	action_data: TweetSearchRecentV2Paginator | UserFollowersV2Paginator | TweetLikingUsersV2Paginator
+	pagination_type: ACTION,
+	pagination_id: string,
+	pagination_data: TweetSearchRecentV2Paginator | UserFollowersV2Paginator | TweetLikingUsersV2Paginator,
 };
 
 const twitterSchema = new Schema<TwitterSettings>({
-	action_type: {
+	pagination_type: {
 		type: String,
 		enum: ACTION,
 		required: true
 	},
-	action_id: {
+	pagination_id: {
 		type: String,
 		required: true
 	},
-	action_data: {
+	pagination_data: {
 		type: Object,
 		required: true
-	}
+	},
 }, {
-	timestamps: true, strict: false
+	timestamps: true
 });
+
+// remove document after 1h //
+twitterSchema.index({"updatedAt": 1 },{ expireAfterSeconds: 3600 });
+
 
 export default model<TwitterSettings>("Twitter", twitterSchema);

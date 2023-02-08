@@ -55,6 +55,8 @@ const LotteryService: ServiceSchema = {
 						return undefined;
 					}
 				},
+			fees_amount: 
+				{ type: "number" },
 			number_of_tokens:
 				{
 					type: "number",

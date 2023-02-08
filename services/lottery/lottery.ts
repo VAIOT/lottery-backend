@@ -112,8 +112,6 @@ lotterySchema.pre('validate', function(next) {
 lotterySchema.pre('save', function(next) {
 	// set lottery id
 	this._id = 2;
-	// set fees_amount
-	this.fees_amount = 10
 
 	// set lottery end date
 	const milliseconds = new Date().getTime() + (this.duration * 60 * 60 * 1000);

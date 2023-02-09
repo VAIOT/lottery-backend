@@ -5,7 +5,7 @@ import type { ITwitter } from "./interfaces/twitter";
 import { hasProperty } from "./utils";
 
 
-export type LotteryDTO = (IERC20 | IERC721 | IMATIC) & { twitter: ITwitter };
+export type LotteryDTO = (IERC20 | IERC721 | IMATIC) & { twitter: ITwitter, fees_amount: number };
 export type LotteryEntity = LotteryDTO & { lottery_end: Date, fees_amount: number };
 
 type LotterySettings = IERC20 & IERC721 & IMATIC & { twitter: ITwitter, lottery_end: Date, fees_amount: number, active: boolean };
@@ -25,7 +25,8 @@ const lotterySchema = new Schema<LotterySettings>({
 	distribution_method: {
 		type: String,
 		enum: TOKEN_DISTRIBUTION_METHOD,
-		required: true
+		required: false,
+		default: undefined
 	},
 	distribution_options: {
 		type: [Number],

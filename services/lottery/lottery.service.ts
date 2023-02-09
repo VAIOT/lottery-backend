@@ -36,7 +36,7 @@ const LotteryService: ServiceSchema = {
 					type: "enum",
 					values: Object.values(TOKEN_DISTRIBUTION_METHOD),
 					optional: true,
-					custom: (value: number[], errors: any[], schema: any, name: any, parent: any, context: any): (number[] | undefined) => {
+					custom: (value: TOKEN_DISTRIBUTION_METHOD, errors: any[], schema: any, name: any, parent: any, context: any): (TOKEN_DISTRIBUTION_METHOD | undefined) => {
 						if (context.data.asset_choice !== TOKEN_TYPE.ERC721) {
 							if (value) {
 								return value;
@@ -171,7 +171,11 @@ const LotteryService: ServiceSchema = {
 	/**
 	 * Methods
 	 */
-	methods: {},
+	methods: {
+		async checkEndedLotteries() {
+			// TODO
+		}
+	},
 
 	/**
 	 * Service created lifecycle event handler
@@ -181,7 +185,8 @@ const LotteryService: ServiceSchema = {
 	/**
 	 * Service started lifecycle event handler
 	 */
-	async started() {
+	started() {
+		this.checkEndedLotteries()
 		// todo iterate through lotteries in db and retrieve end time.
 	},
 

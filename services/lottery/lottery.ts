@@ -8,7 +8,7 @@ import { hasProperty } from "./utils";
 export type LotteryDTO = (IERC20 | IERC721 | IMATIC) & { twitter: ITwitter };
 export type LotteryEntity = LotteryDTO & { lottery_end: Date, fees_amount: number };
 
-type LotterySettings = IERC20 & IERC721 & IMATIC & { twitter: ITwitter, lottery_end: Date, fees_amount: number };
+type LotterySettings = IERC20 & IERC721 & IMATIC & { twitter: ITwitter, lottery_end: Date, fees_amount: number, active: boolean };
 
 const lotterySchema = new Schema<LotterySettings>({
 	_id: {
@@ -93,6 +93,11 @@ const lotterySchema = new Schema<LotterySettings>({
 			required: false,
 			default: undefined
 		}
+	},
+	active: {
+		type: Boolean,
+		required: false,
+		default: undefined
 	}
 }, {
 	timestamps: true

@@ -1,12 +1,21 @@
 import type { Context, ServiceSchema } from "moleculer";
-import { followers, likes, postsWithContent, retweets } from "./functions";
+import mongoose from "mongoose";
+import { TwitterApi } from "twitter-api-v2";
 import type { Account, Post, PostContent } from "./interfaces/twitter";
+import methods from "./methods";
 
-const SocialService: ServiceSchema = {
+mongoose.connect(`mongodb+srv://${process.env.MONGO_USER}:${process.env.MONGO_PASS}@${process.env.MONGO_URI}`)
+.catch((error) => {
+	throw new Error(error)
+});
+
+const TwitterService: ServiceSchema = {
 	name: "twitter",
 	version: 1,
 
-	settings: {},
+	settings: {
+		apiClient: new TwitterApi(<string>process.env.TWITTER_TOKEN).readOnly,
+	},
 
 	actions: {
 		likes: {
@@ -18,8 +27,8 @@ const SocialService: ServiceSchema = {
 			params: {
 				post_url: "string"
 			},
-			async handler(ctx: Context<Post>) {
-				return likes(ctx.params.post_url, this.logger);
+			handler(ctx: Context<Post>) {
+				return this.fetchLikesWithComment(ctx.params.post_url);
 			}
 		},
 		retweets: {
@@ -29,12 +38,10 @@ const SocialService: ServiceSchema = {
 				path: '/retweets'
 			},
 			params: {
-				post_url: "string",
-				date_from: "date"
+				post_url: "string"
 			},
-			async handler(ctx: Context<Post>) {
-				const data = ctx.params;
-				await retweets(data.post_url, this.logger);
+			handler(ctx: Context<Post>) {
+				return this.fetchRetweets(ctx.params.post_url);
 			}
 		},
 		followers: {
@@ -45,12 +52,12 @@ const SocialService: ServiceSchema = {
 			},
 			params: {
 				user: "string",
-				post_url: "string",
-				date_from: "date"
+				post_url: "string"
 			},
-			async handler(ctx: Context<Account>) {
-				const data = ctx.params;
-				await followers(data.user, data.post_url, this.logger);
+			handler(ctx: Context<Account>) {
+				// eslint-disable-next-line @typescript-eslint/naming-convention
+				const { user, post_url } = ctx.params;
+				return this.fetchFollowers(user, post_url);
 			}
 		},
 		content: {
@@ -63,17 +70,10 @@ const SocialService: ServiceSchema = {
 				content: "string",
 				date_from: "date"
 			},
-			async handler(ctx: Context<PostContent>): Promise<string[]> {
-				const data = ctx.params;
-				const wallets: string[] = [];
-
-				const posts = await postsWithContent(data.content, data.date_from, this.logger);
-				if (posts.data) {
-					for await (const post of posts.data) {
-						wallets.push(this.getWallet(post.text));
-					}
-				}
-				return wallets;
+			async handler(ctx: Context<PostContent>) {
+				// eslint-disable-next-line @typescript-eslint/naming-convention
+				const { content, date_from } = ctx.params;
+				await this.fetchPostsWithContent(content, date_from);
 			}
 		}
 	},
@@ -89,7 +89,8 @@ const SocialService: ServiceSchema = {
 	methods: {
 		getWallet(content: string): string {
 			return content; // TODO implementation
-		}
+		},
+		...methods
 	},
 
 	/**
@@ -108,4 +109,4 @@ const SocialService: ServiceSchema = {
 	async stopped() {}
 }
 
-export default SocialService;
+export default TwitterService;

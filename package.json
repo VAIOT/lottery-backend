@@ -4,7 +4,7 @@
   "description": "Vaiot lottery service.",
   "scripts": {
     "build": "tsc --project tsconfig.build.json",
-    "dev": "ts-node ./node_modules/moleculer/bin/moleculer-runner.js --config moleculer.config.ts --hot --repl services/**/*.service.ts",
+    "dev": "ts-node ./node_modules/moleculer/bin/moleculer-runner.js --env --config moleculer.config.ts --hot --repl services/**/*.service.ts",
     "start": "moleculer-runner --config dist/moleculer.config.js",
     "test:types": "concurrently npm:prettier npm:lint npm:typecheck",
     "typecheck": "tsc --noEmit && echo \"tsc: no typecheck errors\"",
@@ -45,10 +45,12 @@
     "typescript": "^4.9.3"
   },
   "dependencies": {
+    "dotenv": "^16.0.3",
     "moleculer": "^0.14.27",
     "moleculer-db": "^0.8.21",
     "moleculer-db-adapter-mongoose": "^0.9.1",
     "mongoose": "^6.9.0",
+    "nats": "^2.11.0",
     "twitter-api-v2": "^1.14.1"
   },
   "engines": {

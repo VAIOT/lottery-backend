@@ -26,13 +26,26 @@ const LotteryService: ServiceSchema = {
 	model: lottery,
 
 	settings: {
-		fields: ["duration", "distribution_method", "number_of_tokens", "num_of_winners", "asset_choice", "twitter"],
+		fields: ["duration", "distribution_method", "number_of_tokens", "distribution_options", "fees_amount", "num_of_winners", "asset_choice", "twitter", "lottery_end"],
 
 		entityValidator: {
 			duration:
 				{ type: "number", integer: true, positive: true },
 			distribution_method:
-				{ type: "enum", values: Object.values(TOKEN_DISTRIBUTION_METHOD) },
+				{ 
+					type: "enum",
+					values: Object.values(TOKEN_DISTRIBUTION_METHOD),
+					optional: true,
+					custom: (value: number[], errors: any[], schema: any, name: any, parent: any, context: any): (number[] | undefined) => {
+						if (context.data.asset_choice !== TOKEN_TYPE.ERC721) {
+							if (value) {
+								return value;
+							}
+							errors.push({type: "required"});
+						}
+						return undefined;
+					}
+				},
 			distribution_options:
 				{
 					type: "array",

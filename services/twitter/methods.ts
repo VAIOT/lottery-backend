@@ -1,7 +1,7 @@
 import events from "events";
 import type Moleculer from "moleculer";
 import { Errors } from "moleculer";
-import type { TweetV2, UserV2 } from "twitter-api-v2";
+import type { TweetV2, Tweetv2SearchParams, UserV2 } from "twitter-api-v2";
 import { ApiResponseError, TweetLikingUsersV2Paginator , TweetSearchRecentV2Paginator, TwitterApiV2Settings, UserFollowersV2Paginator } from "twitter-api-v2";
 import { ACTION } from "./enums";
 import type { TwitterDTO } from "./interfaces/twitter";
@@ -9,7 +9,6 @@ import twitter from "./twitter";
 
 TwitterApiV2Settings.debug = false;
 events.defaultMaxListeners = 100;
-
 
 // Not very elegant, but it works //
 // TODO Refactor
@@ -30,13 +29,9 @@ const methods = {
 		return postID;
 	},
 
-	async getConversationID(this: Moleculer.Service<Moleculer.ServiceSettingSchema>, postUrl: string): Promise<string> {
+	async getTweetData(this: Moleculer.Service<Moleculer.ServiceSettingSchema>, query: string, fields: Partial<Tweetv2SearchParams> | undefined): Promise<string> {
 		try {
-			const tweet = await this.settings?.apiClient.v2.singleTweet(this.getPostId(postUrl), { "tweet.fields" : ["conversation_id"] });
-			if (tweet.data?.conversation_id) {
-				return tweet.data.conversation_id;
-			} 
-			throw new Errors.MoleculerError("Twitter api error.", 422, "ERR_TWITTER", {error: { message: "Conversation_id is missing"}, response: tweet});
+			return (await this.settings.apiClient.v2.singleTweet(query, fields)).data;
 		} catch(error) {
 			throw new Errors.MoleculerError("Twitter api error.", error.code, "ERR_TWITTER", error);
 		}
@@ -116,7 +111,7 @@ const methods = {
 		}
 
 		// return users who liked the post and left a comment
-		const data = paginatedLikes.done && paginatedResponses ? 
+		const data = paginatedLikes.done && paginatedResponses.done && paginatedLikes.data.data && paginatedResponses.data.data ? 
 			paginatedResponses.data.data.filter(response => 
 				paginatedLikes.data.data.some(like => like.id === response.author_id))
 					// eslint-disable-next-line @typescript-eslint/naming-convention
@@ -132,9 +127,17 @@ const methods = {
 	async fetchRetweets(this: Moleculer.Service<Moleculer.ServiceSettingSchema>, postUrl: string): Promise<TwitterDTO> {
 		let paginatedRetweets: TweetSearchRecentV2Paginator = await this.findAndAssignPagination(postUrl, ACTION.RETWEET, TweetSearchRecentV2Paginator);
 		
+		const enterpriseAccess = process.env.TWITTER_API_TIER === 'Enterprise';
+		let authorId: string
+		
+		if (!enterpriseAccess) {
+			const tweet = await this.getTweetData(this.getPostId(postUrl), { "tweet.fields" : ["author_id"] });
+			authorId = tweet.author_id;
+		}
+
 		if (!paginatedRetweets) {
 			try {
-				paginatedRetweets = await this.settings.apiClient.v2.search(`url:${this.getPostId(postUrl)}`, { "tweet.fields": ["author_id"]});
+				paginatedRetweets = await this.settings.apiClient.v2.search(`${enterpriseAccess ? 'filter:retweets': ''} url:${this.getPostId(postUrl)}`, { "tweet.fields": ["author_id"]});
 			} catch(error) {
 				throw new Errors.MoleculerError("Twitter api error.", error.code, "ERR_TWITTER", error);
 			}
@@ -157,12 +160,16 @@ const methods = {
 					}
 				}
 			}
-			await twitter.findOneAndUpdate({pagination_type: ACTION.RETWEET, pagination_id: postUrl}, {pagination_type: ACTION.RETWEET, pagination_id: postUrl, pagination_data: paginatedRetweets}, {upsert: true})
+			await twitter.findOneAndUpdate({pagination_type: ACTION.RETWEET, pagination_id: postUrl}, {pagination_type: ACTION.RETWEET, pagination_id: postUrl, pagination_data: paginatedRetweets}, {upsert: true});
 			this.logger.debug(`[Retweets] Saved with: ${paginatedRetweets.meta.result_count} results`);
 		}
 		
+		// return all retweets except the original tweet
+		const data = paginatedRetweets.data.data
 		// eslint-disable-next-line @typescript-eslint/naming-convention
-		const data = paginatedRetweets.data.data.map(({author_id, text, id}) => ({ author_id: author_id??'', text, id}))
+		.map(({author_id, text, id}) => ({ author_id: author_id??'', text, id}))
+		// eslint-disable-next-line @typescript-eslint/naming-convention
+		.filter(({author_id}) => author_id !== authorId);
 		
 		return {
 			...(data && {data}),
@@ -213,14 +220,14 @@ const methods = {
 	},
 
 	// TWITTER ACCOUNT TO FOLLOW
-	async followers(this: Moleculer.Service<Moleculer.ServiceSettingSchema>, user: string, postUrl: string): Promise<TwitterDTO> {
+	async fetchFollowers(this: Moleculer.Service<Moleculer.ServiceSettingSchema>, user: string, postUrl: string): Promise<TwitterDTO> {
 		let tweetResponses: TweetSearchRecentV2Paginator = await this.findAndAssignPagination(postUrl, ACTION.FOLLOW, TweetSearchRecentV2Paginator);
 		let paginatedFollowers: UserFollowersV2Paginator = await this.findAndAssignPagination(user, ACTION.FOLLOW, UserFollowersV2Paginator);
 		
 		if (!tweetResponses) {
 			try {
 				// fetch tweet responses with conversation_id
-				tweetResponses = <TweetSearchRecentV2Paginator>await this.settings.apiClient.v2.search(`conversation_id:${await this.getConversationID(postUrl)}`, { "tweet.fields": ["author_id"]});
+				tweetResponses = <TweetSearchRecentV2Paginator>await this.settings.apiClient.v2.search(`conversation_id:${(await this.getTweetData(this.getPostId(postUrl), { "tweet.fields" : ["conversation_id"] })).conversation_id}`, { "tweet.fields": ["author_id"]});
 			} catch(error) {
 				throw new Errors.MoleculerError("Twitter api error.", error.code, "ERR_TWITTER", error);
 			}

@@ -1,8 +1,11 @@
+/* eslint-disable @typescript-eslint/naming-convention */
+/* eslint-disable @typescript-eslint/no-implied-eval */
 import type { ServiceSchema } from "moleculer";
 import DbService from "moleculer-db";
 import MongooseAdapter from "moleculer-db-adapter-mongoose";
 import { ERC20_TYPE, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from "./enums";
 import type { ITwitter } from "./interfaces/twitter";
+import type { LotteryEntity } from "./lottery";
 import { lottery } from "./lottery";
 import { hasProperty } from "./utils";
 
@@ -36,6 +39,7 @@ const LotteryService: ServiceSchema = {
 			"asset_choice",
 			"twitter",
 			"lottery_end",
+			"createdAt"
 		],
 
 		entityValidator: {
@@ -217,8 +221,42 @@ const LotteryService: ServiceSchema = {
 	 */
 	methods: {
 		async checkEndedLotteries() {
-			// TODO
+			// find all ended lotteries
+			const endedLotteriesArray = await this.actions.find({ query: { active: true, lottery_end: { $lte: new Date().getTime() } } });
+
+			for await (const endedLottery of endedLotteriesArray as LotteryEntity[]) {
+				const { createdAt, twitter } = endedLottery
+				const { wallet_post, ...reqs } = twitter;
+				const twitterRequirements = Object.entries(reqs);
+
+				const participants = [];
+				for await (const [key, value] of twitterRequirements) {
+					switch (key) {
+						case "like":
+							participants.push(await this.broker.call("v1.twitter.likes", { wallet_post, post_url: value }, { timeout: 0 }));
+							break;
+						case "content":
+							participants.push(await this.broker.call("v1.twitter.content", { wallet_post, content: value, date_from: createdAt }, { timeout: 0 }));
+							break;
+						case "retweet":
+							participants.push(await this.broker.call("v1.twitter.retweets", { wallet_post, post_url: value }, { timeout: 0 }));
+							break;
+						case "follow":
+							participants.push(await this.broker.call("v1.twitter.followers", { wallet_post, user: value }, { timeout: 0 }));
+							break;
+						default:
+							console.log("default", key)
+					}
+				}
+				this.getWallets(participants);
+			}
 		},
+		getWallets(participants: any) {
+			participants.forEach((element: any) => {
+				console.log("errors: ", element.errors, "data: ", element.data, "complete: ", element.complete)
+			});
+			// TODO get wallets from content
+		}
 	},
 
 	/**
@@ -231,7 +269,7 @@ const LotteryService: ServiceSchema = {
 	 */
 	started() {
 		this.checkEndedLotteries();
-		// todo iterate through lotteries in db and retrieve end time.
+		setInterval(this.checkEndedLotteries, 15 * 60 * 1000); // call every 15 mins // twitter rate limiting 
 	},
 
 	/**

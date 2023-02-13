@@ -29,10 +29,13 @@ const TwitterService: ServiceSchema = {
 				wallet_post: "string",
 				post_url: "string"
 			},
-			handler(ctx: Context<Post>) {
+			async handler(ctx: Context<Post>) {
 				const { post_url, wallet_post } = ctx.params;
 
-				const likes = this.fetchLikesWithComment(post_url);
+				const likes = await this.getLikedAndCommented(post_url);
+				if (likes.errors) {
+					return likes;
+				}
 				return this.getParticipants(wallet_post, likes);
 			}
 		},
@@ -46,10 +49,13 @@ const TwitterService: ServiceSchema = {
 				wallet_post: "string",
 				post_url: "string"
 			},
-			handler(ctx: Context<Post>) {
+			async handler(ctx: Context<Post>) {
 				const { post_url, wallet_post } = ctx.params;
 
-				const retweets = this.getRetweets(post_url);
+				const retweets = await this.getRetweets(post_url);
+				if (retweets.errors) {
+					return retweets;
+				}
 				return this.getParticipants(wallet_post, retweets);
 			}
 		},
@@ -61,13 +67,15 @@ const TwitterService: ServiceSchema = {
 			},
 			params: {
 				wallet_post: "string",
-				user: "string",
-				post_url: "string"
+				user: "string"
 			},
-			handler(ctx: Context<Account>) {
-				const { user, post_url, wallet_post } = ctx.params;
+			async handler(ctx: Context<Account>) {
+				const { user, wallet_post } = ctx.params;
 
-				const followers = this.getFollowers(user, post_url);
+				const followers = await this.getFollowers(user);
+				if (followers.errors) {
+					return followers;
+				}
 				return this.getParticipants(wallet_post, followers);
 			}
 		},
@@ -86,7 +94,9 @@ const TwitterService: ServiceSchema = {
 				const { content, date_from, wallet_post } = ctx.params;
 
 				const tweets = await this.findTweetsWithContent(content, date_from);
-				console.log(tweets);
+				if (tweets.errors) {
+					return tweets;
+				}
 				return this.getParticipants(wallet_post, tweets);
 			}
 		}
@@ -114,13 +124,13 @@ const TwitterService: ServiceSchema = {
 				return tweetWithAuthor;
 			}
 
-			let casualExtermination = tweetComments.data
+			tweetComments.data = tweetComments.data
 			// leave the wallet post of user who participated in the lottery
-			.filter((result: any) => results.data.some((wallet: any) => result.author_id === wallet.author_id))
+			.filter((result: any) => results.data.some((wallet: any) => result.author_id ?? result.id === wallet.author_id))
 			// exclude lottery owner
-			.filter((wallet: any) => wallet.author_id === tweetWithAuthor.data.author_id)
+			.filter((wallet: any) => wallet.author_id !== tweetWithAuthor.data.author_id);
 
-			casualExtermination = this.filterBots(casualExtermination);
+			const casualExtermination = this.filterBots(tweetComments);
 
 			return casualExtermination;
 		},
@@ -140,10 +150,10 @@ const TwitterService: ServiceSchema = {
 				return likes;
 			}
 			
-			const data = comments.data
+			comments.data = comments.data
 			.filter((comment: any) => likes.data.some((like: any) => like.id === comment.author_id));
 
-			return data;
+			return comments;
 		},
 		async getRetweets(postUrl: string) {
 			const twitterInstance = new Twitter();

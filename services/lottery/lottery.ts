@@ -5,7 +5,7 @@ import type { ITwitter } from "./interfaces/twitter";
 import { hasProperty } from "./utils";
 
 export type LotteryDTO = (IERC20 | IERC721 | IMATIC) & { twitter: ITwitter; fees_amount: number };
-export type LotteryEntity = LotteryDTO & { lottery_end: Date; fees_amount: number };
+export type LotteryEntity = LotteryDTO & { lottery_end: Date; fees_amount: number, createdAt: Date };
 
 type LotterySettings = IERC20 &
 	IERC721 &
@@ -118,8 +118,9 @@ const lotterySchema = new Schema<LotterySettings>(
 );
 
 lotterySchema.pre("validate", function (next) {
-	const twitterReq: (keyof ITwitter)[] = ["content", "follow", "like", "retweet"];
-	if (hasProperty(this.toObject().twitter, twitterReq)) {
+	const twitterReq: (keyof Omit<ITwitter, "wallet_post">)[] = ["content", "follow", "like", "retweet"];
+	// eslint-disable-next-line @typescript-eslint/naming-convention
+	if (hasProperty((({ wallet_post, ...data }) => data)(this.toObject().twitter), twitterReq)) {
 		return next();
 	}
 	return next(new Error("At least one Twitter requirement should be defined."));

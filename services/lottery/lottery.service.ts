@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 /* eslint-disable @typescript-eslint/no-implied-eval */
-import type { ServiceSchema } from "moleculer";
+import type { Context, ServiceSchema } from "moleculer";
 import DbService from "moleculer-db";
 import MongooseAdapter from "moleculer-db-adapter-mongoose";
 import { ERC20_TYPE, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from "./enums";
@@ -214,22 +214,35 @@ const LotteryService: ServiceSchema = {
 	/**
 	 * Events
 	 */
-	events: {},
+	events: {
+		"lottery.created": function(ctx: Context) {
+			// TODO update "active" field if transaction is done
+		}
+	},
 
 	/**
 	 * Methods
 	 */
 	methods: {
-		async checkEndedLotteries() {
-			// find all ended lotteries
-			const endedLotteriesArray = await this.actions.find({ query: { active: true, lottery_end: { $lte: new Date().getTime() } } });
-
-			for await (const endedLottery of endedLotteriesArray as LotteryEntity[]) {
+		async getWinners() {
+			const endedLotteries = await this.getEndedLotteries();
+			
+			if (endedLotteries) {
+				const wallets = this.getWallets(await this.getParticipants(endedLotteries));
+				
+				// TODO call contracts
+			}
+		},
+		getEndedLotteries() {
+			return this.actions.find({ query: { active: true, lottery_end: { $lte: new Date().getTime() } } });
+		},
+		async getParticipants(endedLotteriesArray: LotteryEntity[]) {
+			const participants = [];
+			for await (const endedLottery of endedLotteriesArray) {
 				const { createdAt, twitter } = endedLottery
 				const { wallet_post, ...reqs } = twitter;
 				const twitterRequirements = Object.entries(reqs);
 
-				const participants = [];
 				for await (const [key, value] of twitterRequirements) {
 					switch (key) {
 						case "like":
@@ -248,14 +261,21 @@ const LotteryService: ServiceSchema = {
 							console.log("default", key)
 					}
 				}
-				this.getWallets(participants);
 			}
+			return participants;
 		},
-		getWallets(participants: any) {
-			participants.forEach((element: any) => {
-				console.log("errors: ", element.errors, "data: ", element.data, "complete: ", element.complete)
-			});
-			// TODO get wallets from content
+		getWallets(participants: any): string[] {
+			const hasErrors = participants.some((result: any) => result.errors);
+			const fetchingComplete = participants.every((result: any) => result.complete);
+
+			if (hasErrors && !fetchingComplete) {
+				// TODO log errors
+				console.log(participants.map((result: any) => result.errors));
+				return [];
+			}
+
+			// get wallets from content
+			return participants.map(({ text }: any) => text.match("^0x[a-fA-F0-9]{40}$"));
 		}
 	},
 
@@ -268,8 +288,8 @@ const LotteryService: ServiceSchema = {
 	 * Service started lifecycle event handler
 	 */
 	started() {
-		this.checkEndedLotteries();
-		setInterval(this.checkEndedLotteries, 15 * 60 * 1000); // call every 15 mins // twitter rate limiting 
+		this.getWinners();
+		setInterval(this.getWinners, 15 * 60 * 1000); // call every 15 mins // twitter rate limiting 
 	},
 
 	/**

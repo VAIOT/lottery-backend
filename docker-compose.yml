@@ -3,38 +3,32 @@ version: "3.3"
 services:
 
 
-  greeter:
+  social:
     build:
       context: .
     image: vaiot-lottery-service
     env_file: docker-compose.env
     environment:
-      SERVICES: greeter
+      SERVICES: social
     networks:
-      - internal
+      -  vaiot-api-gateway_internal
 
-  products:
+  lottery:
     build:
       context: .
     image: vaiot-lottery-service
     env_file: docker-compose.env
     environment:
-      SERVICES: products
+      SERVICES: lottery
     depends_on:
-      - mongo
+      - social
     networks:
-      - internal
-
-  mongo:
-    image: mongo:4
-    volumes:
-      - data:/data/db
-    networks:
-      - internal
+      -  vaiot-api-gateway_internal
 
 
 networks:
-  internal:
+  vaiot-api-gateway_internal:
+    external: true
 
 volumes:
   data:

@@ -97,7 +97,7 @@ export default class Twitter {
             if (search.errors.length > 0) {
                 return { errors: search.errors };
             } if (search.meta.result_count === 0) {
-                return { errors: [{ value: 'No tweets found' }] }
+                return { data: [], complete: true }
             }
         }
 

@@ -1,3 +1,4 @@
+import type { Model} from "mongoose";
 import { model, Schema } from "mongoose";
 import { ERC20_TYPE, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from "./enums";
 import type { IERC20, IERC721, IMATIC } from "./interfaces/lottery";
@@ -126,12 +127,14 @@ lotterySchema.pre("validate", function (next) {
 	return next(new Error("At least one Twitter requirement should be defined."));
 });
 
-/**
- * todo set lottery id
- * */
-lotterySchema.pre("save", function (next) {
+
+lotterySchema.pre("save", async function (next) {
+	const lastId = (await (this.constructor as typeof Model).find({}).sort({_id: -1}).limit(1))[0]._id as number;
+
 	// set lottery id
-	this._id = 2;
+	this._id = lastId
+	? lastId + 1
+	: 1;
 
 	// set lottery end date
 	const milliseconds = new Date().getTime() + this.duration * 60 * 60 * 1000;

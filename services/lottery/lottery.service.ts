@@ -82,11 +82,8 @@ const LotteryService: ServiceSchema = {
 					parent: any,
 					context: any,
 				): number[] | undefined => {
-					if (
-						context.data.asset_choice !== TOKEN_TYPE.ERC721 &&
-						context.data.distribution_method === TOKEN_DISTRIBUTION_METHOD.PERCENTAGE
-					) {
-						if (value) {
+					if (context.data.asset_choice !== TOKEN_TYPE.ERC721) {
+						if (context.data.distribution_method === TOKEN_DISTRIBUTION_METHOD.PERCENTAGE && value) {
 							if (value.reduce((sum, val) => sum + val, 0) === 100) {
 								return value;
 							}
@@ -225,9 +222,9 @@ const LotteryService: ServiceSchema = {
 					lotteryType: distribution_method, // SPLIT OR PERCENTAGE
 					author: wallet,
 					numOfWinners: num_of_winners, 
-					// rewardAmounts: { type: "array", optional: true },
+					rewardAmounts: distribution_options,
 					totalReward: number_of_tokens,
-					// finalRewards: { type: "array", optional: true },
+					// finalRewards: final_rewards,
 					rewardProportions: distribution_options,
 				};
 

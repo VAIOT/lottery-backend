@@ -31,7 +31,7 @@ const LotteryService: ServiceSchema = {
 
 	settings: {
 		fields: [
-			"_id",
+			"id",
 			"duration",
 			"distribution_method",
 			"number_of_tokens",
@@ -214,11 +214,31 @@ const LotteryService: ServiceSchema = {
 	actions: {},
 
 	/**
-	 * Events
+	 * Hooks
 	 */
-	events: {
-		"lottery.created": function(ctx: Context) {
-			// TODO update "active" field if transaction is done
+	hooks: {
+		before: {
+			async create(ctx: Context<Partial<LotteryEntity>>) {
+				return;
+				const { distribution_method, wallet, num_of_winners, distribution_options, number_of_tokens } = ctx.params;
+				const data = {
+					lotteryType: distribution_method, // SPLIT OR PERCENTAGE
+					author: wallet,
+					numOfWinners: num_of_winners, 
+					// rewardAmounts: { type: "array", optional: true },
+					totalReward: number_of_tokens,
+					// finalRewards: { type: "array", optional: true },
+					rewardProportions: distribution_options,
+				};
+
+				await ctx.broker.call("v1.matic.openLottery", data, { timeout: 0 });
+				// TODO update "active" field if transaction is done
+			}
+		},
+		after: {
+			create(ctx: Context<Partial<LotteryEntity>>, savedLottery: LotteryEntity) {
+				return savedLottery;
+			}
 		}
 	},
 
@@ -227,18 +247,27 @@ const LotteryService: ServiceSchema = {
 	 */
 	methods: {
 		async getWinners() {
-			const endedLotteries = await this.getEndedLotteries();
+			const endedLotteries = await this.fetchEndedLotteries();
 			if (endedLotteries) {
 				for await (const endedLottery of endedLotteries) {
+					const lotteryExist = await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.checkIfLotteryExists`, { lotteryId: endedLotteries.id }, { timeout: 0 });
+					if (!lotteryExist) {
+						// eslint-disable-next-line no-continue
+						continue;
+					}
+
 					const wallets = await this.getParticipants(endedLottery);
 					
 					if (wallets && await this.actions.update({ id: endedLottery._id, active: false })) {
-						// TODO call contracts
+						const data = { lotteryId: endedLottery.id, participants: wallets };
+
+						await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.addParticipants`, data, { timeout: 0 });
 					}
 				}
 			}
+			setTimeout(this.getWinners, 15 * 60 * 1000); // call after 15 mins // twitter rate limiting 
 		},
-		getEndedLotteries() {
+		fetchEndedLotteries() {
 			return this.actions.find({ query: { active: true, lottery_end: { $lte: new Date().getTime() } } });
 		},
 		async getParticipants(endedLottery: LotteryEntity) {
@@ -294,7 +323,6 @@ const LotteryService: ServiceSchema = {
 	 */
 	started() {
 		this.getWinners();
-		setInterval(this.getWinners, 15 * 60 * 1000); // call every 15 mins // twitter rate limiting 
 	},
 
 	/**

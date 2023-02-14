@@ -10,7 +10,7 @@ export type LotteryEntity = LotteryDTO & { lottery_end: Date; fees_amount: numbe
 
 type LotterySettings = IERC20 &
 	IERC721 &
-	IMATIC & { twitter: ITwitter; lottery_end: Date; fees_amount: number; active: boolean };
+	IMATIC & { twitter: ITwitter; lottery_end: Date; fees_amount: number; active: boolean, final_rewards: string[] };
 
 const lotterySchema = new Schema<LotterySettings>(
 	{
@@ -47,6 +47,9 @@ const lotterySchema = new Schema<LotterySettings>(
 		wallet: {
 			type: String,
 			required: true,
+		},
+		final_rewards: {
+			type: [String],
 		},
 		num_of_winners: {
 			type: Number,

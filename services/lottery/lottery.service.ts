@@ -82,11 +82,8 @@ const LotteryService: ServiceSchema = {
 					parent: any,
 					context: any,
 				): number[] | undefined => {
-					if (
-						context.data.asset_choice !== TOKEN_TYPE.ERC721 &&
-						context.data.distribution_method === TOKEN_DISTRIBUTION_METHOD.PERCENTAGE
-					) {
-						if (value) {
+					if (context.data.asset_choice !== TOKEN_TYPE.ERC721) {
+						if (context.data.distribution_method === TOKEN_DISTRIBUTION_METHOD.PERCENTAGE && value) {
 							if (value.reduce((sum, val) => sum + val, 0) === 100) {
 								return value;
 							}
@@ -214,11 +211,31 @@ const LotteryService: ServiceSchema = {
 	actions: {},
 
 	/**
-	 * Events
+	 * Hooks
 	 */
-	events: {
-		"lottery.created": function(ctx: Context) {
-			// TODO update "active" field if transaction is done
+	hooks: {
+		before: {
+			async create(ctx: Context<Partial<LotteryEntity>>) {
+				return;
+				const { distribution_method, wallet, num_of_winners, distribution_options, number_of_tokens } = ctx.params;
+				const data = {
+					lotteryType: distribution_method, // SPLIT OR PERCENTAGE
+					author: wallet,
+					numOfWinners: num_of_winners, 
+					rewardAmounts: distribution_options,
+					totalReward: number_of_tokens,
+					// finalRewards: final_rewards,
+					rewardProportions: distribution_options,
+				};
+
+				await ctx.broker.call("v1.matic.openLottery", data, { timeout: 0 });
+				// TODO update "active" field if transaction is done
+			}
+		},
+		after: {
+			create(ctx: Context<Partial<LotteryEntity>>, savedLottery: LotteryEntity) {
+				return savedLottery;
+			}
 		}
 	},
 

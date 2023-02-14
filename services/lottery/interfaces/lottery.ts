@@ -4,11 +4,13 @@ interface ILotteryBase {
 	id: number;
 	duration: number;
 	distribution_method: TOKEN_DISTRIBUTION_METHOD;
-	distribution_options: number[];
-	number_of_tokens: number;
+	distribution_options: string[];
+	number_of_tokens: string;
 	wallet: string;
+	fees_amount: string;
 	num_of_winners: number;
 	asset_choice: TOKEN_TYPE;
+	final_rewards?: string[];
 }
 
 export interface IERC20 extends ILotteryBase {

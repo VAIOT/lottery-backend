@@ -5,12 +5,12 @@ import type { IERC20, IERC721, IMATIC } from "./interfaces/lottery";
 import type { ITwitter } from "./interfaces/twitter";
 import { hasProperty } from "./utils";
 
-export type LotteryDTO = (IERC20 | IERC721 | IMATIC) & { twitter: ITwitter; fees_amount: number };
-export type LotteryEntity = LotteryDTO & { lottery_end: Date; fees_amount: number, createdAt: Date };
+export type LotteryDTO = (IERC20 | IERC721 | IMATIC) & { twitter: ITwitter };
+export type LotteryEntity = LotteryDTO & { lottery_end: Date; createdAt: Date };
 
 type LotterySettings = IERC20 &
 	IERC721 &
-	IMATIC & { twitter: ITwitter; lottery_end: Date; fees_amount: number; active: boolean, final_rewards: string[] };
+	IMATIC & { twitter: ITwitter; lottery_end: Date; active: boolean };
 
 const lotterySchema = new Schema<LotterySettings>(
 	{
@@ -32,17 +32,17 @@ const lotterySchema = new Schema<LotterySettings>(
 			default: undefined,
 		},
 		distribution_options: {
-			type: [Number],
+			type: [String],
 			required: false,
 			default: undefined,
 		},
 		number_of_tokens: {
-			type: Number,
+			type: String,
 			required: false,
 			default: undefined,
 		},
 		fees_amount: {
-			type: Number,
+			type: String,
 		},
 		wallet: {
 			type: String,

@@ -70,21 +70,21 @@ const LotteryService: ServiceSchema = {
 			distribution_options: {
 				type: "array",
 				items: {
-					type: "number",
+					type: "string",
 					positive: true,
 				},
 				optional: true,
 				custom: (
-					value: number[],
+					value: string[],
 					errors: any[],
 					schema: any,
 					name: any,
 					parent: any,
 					context: any,
-				): number[] | undefined => {
+				): string[] | undefined => {
 					if (context.data.asset_choice !== TOKEN_TYPE.ERC721) {
 						if (context.data.distribution_method === TOKEN_DISTRIBUTION_METHOD.PERCENTAGE && value) {
-							if (value.reduce((sum, val) => sum + val, 0) === 100) {
+							if (value.reduce((sum, val) => sum + Number(val.slice(0,2)), 0) === 100) {
 								return value;
 							}
 							errors.push({ type: "numberEqual", expected: 100 });
@@ -95,19 +95,19 @@ const LotteryService: ServiceSchema = {
 					return undefined;
 				},
 			},
-			fees_amount: { type: "number" },
+			fees_amount: { type: "string" },
 			number_of_tokens: {
-				type: "number",
+				type: "string",
 				positive: true,
 				optional: true,
 				custom: (
-					value: number,
+					value: string,
 					errors: any[],
 					schema: any,
 					name: any,
 					parent: any,
 					context: any,
-				): number | undefined => {
+				): string | undefined => {
 					if (context.data.asset_choice !== TOKEN_TYPE.ERC721) {
 						if (value) {
 							return value;
@@ -118,6 +118,12 @@ const LotteryService: ServiceSchema = {
 				},
 			},
 			wallet: { type: "startsWith", expected: "0x", length: 42 },
+			final_rewards: {
+				type:  "array",
+				items: {
+					type: "string",
+				},
+			},
 			num_of_winners: { type: "number", integer: true, positive: true },
 			asset_choice: { type: "enum", values: Object.values(TOKEN_TYPE) },
 			erc20_choice: {
@@ -214,26 +220,21 @@ const LotteryService: ServiceSchema = {
 	 * Hooks
 	 */
 	hooks: {
-		before: {
-			async create(ctx: Context<Partial<LotteryEntity>>) {
-				return;
-				const { distribution_method, wallet, num_of_winners, distribution_options, number_of_tokens } = ctx.params;
+		after: {
+			async create(ctx: Context<Partial<LotteryEntity>>, savedLottery: LotteryEntity) {
+				const { distribution_method, wallet, num_of_winners, distribution_options, number_of_tokens, final_rewards } = ctx.params;
 				const data = {
 					lotteryType: distribution_method, // SPLIT OR PERCENTAGE
 					author: wallet,
 					numOfWinners: num_of_winners, 
 					rewardAmounts: distribution_options,
 					totalReward: number_of_tokens,
-					// finalRewards: final_rewards,
+					finalRewards: final_rewards,
 					rewardProportions: distribution_options,
 				};
-
 				await ctx.broker.call("v1.matic.openLottery", data, { timeout: 0 });
-				// TODO update "active" field if transaction is done
-			}
-		},
-		after: {
-			create(ctx: Context<Partial<LotteryEntity>>, savedLottery: LotteryEntity) {
+				
+				// await this.actions.update({ id: endedLottery._id, active: true })
 				return savedLottery;
 			}
 		}

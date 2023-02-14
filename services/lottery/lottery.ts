@@ -14,7 +14,7 @@ type LotterySettings = IERC20 &
 
 const lotterySchema = new Schema<LotterySettings>(
 	{
-		_id: {
+		id: {
 			type: Number,
 		},
 		duration: {
@@ -128,11 +128,15 @@ lotterySchema.pre("validate", function (next) {
 });
 
 
-lotterySchema.pre("save", async function (next) {
-	const lastId = (await (this.constructor as typeof Model).find({}).sort({_id: -1}).limit(1))[0]._id as number;
+lotterySchema.pre("save", async function(next) {
+	const erc = { asset_choice: { "$ne": "MATIC" } };
+	const matic = { asset_choice: TOKEN_TYPE.MATIC };
 
+	const assetType = (this.asset_choice === TOKEN_TYPE.MATIC) ? matic : erc;
+
+	const lastId = (await (this.constructor as typeof Model).find(assetType).sort({ id: -1}).limit(1))[0]?.id as number;
 	// set lottery id
-	this._id = lastId
+	this.id = lastId
 	? lastId + 1
 	: 1;
 

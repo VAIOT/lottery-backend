@@ -12,8 +12,9 @@ import { hasProperty } from "./utils";
 const regex = {
 	twitter: {
 		post: "^(http(s)?:\\/\\/)?twitter\\.com\\/(?:#!\\/)?(\\w+)\\/status(es)?\\/(\\d+)$",
-		username: "^@(\\w{1,15})$",
+		username: "^@(\\w{1,15})$"
 	},
+	wallet: /0x[a-fA-Z0-9]{40}/
 };
 
 const LotteryService: ServiceSchema = {
@@ -30,6 +31,7 @@ const LotteryService: ServiceSchema = {
 
 	settings: {
 		fields: [
+			"_id",
 			"duration",
 			"distribution_method",
 			"number_of_tokens",
@@ -226,56 +228,59 @@ const LotteryService: ServiceSchema = {
 	methods: {
 		async getWinners() {
 			const endedLotteries = await this.getEndedLotteries();
-			
 			if (endedLotteries) {
-				const wallets = this.getWallets(await this.getParticipants(endedLotteries));
-				
-				// TODO call contracts
+				for await (const endedLottery of endedLotteries) {
+					const wallets = await this.getParticipants(endedLottery);
+					
+					if (wallets && await this.actions.update({ id: endedLottery._id, active: false })) {
+						// TODO call contracts
+					}
+				}
 			}
 		},
 		getEndedLotteries() {
 			return this.actions.find({ query: { active: true, lottery_end: { $lte: new Date().getTime() } } });
 		},
-		async getParticipants(endedLotteriesArray: LotteryEntity[]) {
-			const participants = [];
-			for await (const endedLottery of endedLotteriesArray) {
-				const { createdAt, twitter } = endedLottery
-				const { wallet_post, ...reqs } = twitter;
-				const twitterRequirements = Object.entries(reqs);
+		async getParticipants(endedLottery: LotteryEntity) {
+			const { createdAt, twitter } = endedLottery;
+			const { wallet_post, ...reqs } = twitter;
+			const twitterRequirements = Object.entries(reqs);
 
-				for await (const [key, value] of twitterRequirements) {
-					switch (key) {
-						case "like":
-							participants.push(await this.broker.call("v1.twitter.likes", { wallet_post, post_url: value }, { timeout: 0 }));
-							break;
-						case "content":
-							participants.push(await this.broker.call("v1.twitter.content", { wallet_post, content: value, date_from: createdAt }, { timeout: 0 }));
-							break;
-						case "retweet":
-							participants.push(await this.broker.call("v1.twitter.retweets", { wallet_post, post_url: value }, { timeout: 0 }));
-							break;
-						case "follow":
-							participants.push(await this.broker.call("v1.twitter.followers", { wallet_post, user: value }, { timeout: 0 }));
-							break;
-						default:
-							console.log("default", key)
-					}
+			const participants = [];
+			for await (const [key, value] of twitterRequirements) {
+				switch (key) {
+					case "like":
+						participants.push(await this.broker.call("v1.twitter.likes", { wallet_post, post_url: value }, { timeout: 0 }));
+						break;
+					case "content":
+						participants.push(await this.broker.call("v1.twitter.content", { wallet_post, content: value, date_from: createdAt }, { timeout: 0 }));
+						break;
+					case "retweet":
+						participants.push(await this.broker.call("v1.twitter.retweets", { wallet_post, post_url: value }, { timeout: 0 }));
+						break;
+					case "follow":
+						participants.push(await this.broker.call("v1.twitter.followers", { wallet_post, user: value }, { timeout: 0 }));
+						break;
+					default:
+						console.log("default", key)
 				}
 			}
-			return participants;
+			return this.getWallets(participants);
 		},
-		getWallets(participants: any): string[] {
+		getWallets(participants: any): string[] | null {
 			const hasErrors = participants.some((result: any) => result.errors);
 			const fetchingComplete = participants.every((result: any) => result.complete);
 
-			if (hasErrors && !fetchingComplete) {
-				// TODO log errors
-				console.log(participants.map((result: any) => result.errors));
-				return [];
+			if (hasErrors || !fetchingComplete) {
+				// Log errors
+				this.logger.error(participants.map((result: any) => result.errors));
+				return null;
 			}
 
-			// get wallets from content
-			return participants.map(({ text }: any) => text.match("^0x[a-fA-F0-9]{40}$"));
+			// Get wallets from content
+			return participants
+			.flatMap(({data}: any) => data
+			.map(({text}: any) => text.match(regex.wallet)?.[0]));
 		}
 	},
 

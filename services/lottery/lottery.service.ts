@@ -31,7 +31,8 @@ const LotteryService: ServiceSchema = {
 
 	settings: {
 		fields: [
-			"id",
+			"_id",
+			"lottery_id",
 			"duration",
 			"distribution_method",
 			"number_of_tokens",
@@ -83,14 +84,17 @@ const LotteryService: ServiceSchema = {
 					context: any,
 				): string[] | undefined => {
 					if (context.data.asset_choice !== TOKEN_TYPE.ERC721) {
-						if (context.data.distribution_method === TOKEN_DISTRIBUTION_METHOD.PERCENTAGE && value) {
-							if (value.reduce((sum, val) => sum + Number(val.slice(0,2)), 0) === 100) {
-								return value;
+						if (value) {
+							if (context.data.distribution_method === TOKEN_DISTRIBUTION_METHOD.PERCENTAGE) {
+								console.log(value)
+								if (value.reduce((sum, val) => sum + Number(val.slice(0,2)), 0) === 100) {
+									return value;
+								}
+								errors.push({ type: "numberEqual", expected: 100 });
 							}
-							errors.push({ type: "numberEqual", expected: 100 });
-						} else {
-							errors.push({ type: "required" });
+							return value;
 						}
+						errors.push({ type: "required" });
 					}
 					return undefined;
 				},
@@ -122,6 +126,23 @@ const LotteryService: ServiceSchema = {
 				type:  "array",
 				items: {
 					type: "string",
+				},
+				optional: true,
+				custom: (
+					value: string[],
+					errors: any[],
+					schema: any,
+					name: any,
+					parent: any,
+					context: any,
+				): string[] | undefined => {
+					if (context.data.distribution_method === TOKEN_DISTRIBUTION_METHOD.PERCENTAGE) {
+						if (value) {
+							return value;
+						}
+						errors.push({ type: "required" });
+					}
+					return undefined;
 				},
 			},
 			num_of_winners: { type: "number", integer: true, positive: true },
@@ -234,7 +255,8 @@ const LotteryService: ServiceSchema = {
 				};
 				await ctx.broker.call("v1.matic.openLottery", data, { timeout: 0 });
 				
-				// await this.actions.update({ id: endedLottery._id, active: true })
+				// await this.actions.update({ id: savedLottery._id, active: true });
+
 				return savedLottery;
 			}
 		}

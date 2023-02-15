@@ -1,7 +1,7 @@
 import type { ERC20_TYPE, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from "../enums";
 
 interface ILotteryBase {
-	id: number;
+	lottery_id: number;
 	duration: number;
 	distribution_method: TOKEN_DISTRIBUTION_METHOD;
 	distribution_options: string[];

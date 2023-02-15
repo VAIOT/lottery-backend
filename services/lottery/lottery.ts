@@ -121,16 +121,6 @@ const lotterySchema = new Schema<LotterySettings>(
 	},
 );
 
-lotterySchema.pre("validate", function (next) {
-	const twitterReq: (keyof Omit<ITwitter, "wallet_post">)[] = ["content", "follow", "like", "retweet"];
-	// eslint-disable-next-line @typescript-eslint/naming-convention
-	if (hasProperty((({ wallet_post, ...data }) => data)(this.toObject().twitter), twitterReq)) {
-		return next();
-	}
-	return next(new Error("At least one Twitter requirement should be defined."));
-});
-
-
 lotterySchema.pre("save", async function(next) {
 	const erc = { asset_choice: { "$ne": "MATIC" } };
 	const matic = { asset_choice: TOKEN_TYPE.MATIC };

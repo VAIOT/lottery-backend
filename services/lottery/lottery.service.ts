@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 /* eslint-disable @typescript-eslint/no-implied-eval */
-import type { Context, ServiceSchema } from "moleculer";
+import type { ActionSchema, Context, ServiceSchema } from "moleculer";
 import DbService from "moleculer-db";
 import MongooseAdapter from "moleculer-db-adapter-mongoose";
 import { ERC20_TYPE, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from "./enums";
@@ -242,7 +242,7 @@ const LotteryService: ServiceSchema = {
 	 */
 	hooks: {
 		after: {
-			async create(ctx: Context<Partial<LotteryEntity>>, savedLottery: LotteryEntity) {
+			async create(ctx: Context<LotteryEntity>, savedLottery: LotteryEntity) {
 				const { distribution_method, wallet, num_of_winners, distribution_options, number_of_tokens, final_rewards } = ctx.params;
 				const data = {
 					lotteryType: distribution_method, // SPLIT OR PERCENTAGE
@@ -253,9 +253,9 @@ const LotteryService: ServiceSchema = {
 					finalRewards: final_rewards,
 					rewardProportions: distribution_options,
 				};
-				await ctx.broker.call("v1.matic.openLottery", data, { timeout: 0 });
-				
-				// await this.actions.update({ id: savedLottery._id, active: true });
+				await ctx.call("v1.matic.openLottery", data, { timeout: 0 });
+				// It works \/
+				await (this.actions as ActionSchema).update({ id: savedLottery._id, active: true });
 
 				return savedLottery;
 			}

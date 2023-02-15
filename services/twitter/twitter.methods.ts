@@ -109,6 +109,14 @@ export default class Twitter {
     }
 
     /**
+     * Adds new tweet using the passed content
+     * @param content post content
+    */
+    async addPost(content: string): Promise<string> {
+        return (await this.api.tweet(content)).data.id;
+    }
+
+    /**
      * Automatic pagination caching
      */
     private async searchTweets(query: string, fields?: Partial<Tweetv2SearchParams>, searchType: SEARCH_TYPE = SEARCH_TYPE.CONTENT) {

@@ -6,7 +6,7 @@ import type { ITwitter } from "./interfaces/twitter";
 import { hasProperty } from "./utils";
 
 export type LotteryDTO = (IERC20 | IERC721 | IMATIC) & { twitter: ITwitter };
-export type LotteryEntity = LotteryDTO & { lottery_end: Date; createdAt: Date };
+export type LotteryEntity = LotteryDTO & { _id: string, lottery_end: Date; createdAt: Date };
 
 type LotterySettings = IERC20 &
 	IERC721 &
@@ -14,7 +14,7 @@ type LotterySettings = IERC20 &
 
 const lotterySchema = new Schema<LotterySettings>(
 	{
-		id: {
+		lottery_id: {
 			type: Number,
 		},
 		duration: {
@@ -137,9 +137,9 @@ lotterySchema.pre("save", async function(next) {
 
 	const assetType = (this.asset_choice === TOKEN_TYPE.MATIC) ? matic : erc;
 
-	const lastId = (await (this.constructor as typeof Model).find(assetType).sort({ id: -1}).limit(1))[0]?.id as number;
+	const lastId = (await (this.constructor as typeof Model).find(assetType).sort({ lottery_id: -1}).limit(1))[0]?.lottery_id as number;
 	// set lottery id
-	this.id = lastId
+	this.lottery_id = lastId
 	? lastId + 1
 	: 1;
 

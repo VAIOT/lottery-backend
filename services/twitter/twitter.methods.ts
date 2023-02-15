@@ -12,10 +12,18 @@ export default class Twitter {
         this.api = new TwitterApi(<string>process.env.TWITTER_TOKEN).v2;
     }
 
+    /**
+     * Get the author of a tweet given its URL
+     * @param postUrl The URL of the tweet
+     */
     async getTweetAuthor(postUrl: string): Promise<Promise<any>> {
         return this.getTweetData(postUrl, { "tweet.fields" : ["author_id"] });
     }
 
+    /**
+     * Get the users who liked the tweet
+     * @param postUrl The URL of the tweet
+     */
     async getTweetLikes(postUrl: string): Promise<TweetLikingUsersV2Paginator | { data: TweetV2[] | UserV2[], complete: boolean, errors?: never } | { errors: unknown[], data?: never }> {
         const completeQuery = `Likes:${postUrl}`;
 
@@ -36,6 +44,10 @@ export default class Twitter {
         return this.iteratePaginator(users, completeQuery);
     }
 
+    /**
+     * Get all comments for a tweet
+     * @param postUrl The URL of the tweet
+     */
     async getTweetComments(postUrl: string): Promise<{data?: any, complete?: boolean } & { errors?: any[]}> {
         const tweetWithConversation = await this.getTweetData(postUrl, { "tweet.fields": ["conversation_id"] });
 
@@ -51,6 +63,10 @@ export default class Twitter {
         return tweetComments;
     }
     
+    /**
+     * Get the retweets
+     * @param postUrl The URL of the tweet
+     */
     async getRetweets(postUrl: string): Promise<{ data?: never, errors: unknown[] } | { data: any, errors?: never, complete: boolean }> {
         const postId = this.getPostId(postUrl);
         if (postId.errors) {
@@ -59,10 +75,19 @@ export default class Twitter {
         return this.searchTweets(postId.data, { "tweet.fields": ["author_id"] }, SEARCH_TYPE.URL);
     }
 
+    /**
+     * Find tweets created after the given date with specific content
+     * @param content The searched phrase
+     * @param dateFrom Start date
+     */
     async findTweetsWithContent(content: string, dateFrom: Date): Promise<TweetSearchRecentV2Paginator | Partial<{ data: TweetV2[] | UserV2[], errors: unknown[], complete: boolean }>> {
         return this.searchTweets(content, { start_time: dateFrom.toISOString(), "tweet.fields": ["author_id"] }, SEARCH_TYPE.CONTENT);
     }
 
+    /**
+     * Retrieve followers for given user
+     * @param user username of the user
+    */
     async getFollowers(user: string): Promise<UserFollowersV2Paginator | UserV2Result | Partial<{ data: UserV2[] | TweetV2[]; errors: unknown[]; complete: boolean; }>> {
         const completeQuery = `Followers:${user}`;
         const userData = await this.getUserData(user);

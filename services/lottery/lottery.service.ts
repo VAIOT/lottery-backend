@@ -4,10 +4,9 @@ import type { ActionSchema, Context, ServiceSchema } from "moleculer";
 import DbService from "moleculer-db";
 import MongooseAdapter from "moleculer-db-adapter-mongoose";
 import { ERC20_TYPE, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from "./enums";
-import type { ITwitter } from "./interfaces/twitter";
 import type { LotteryEntity } from "./lottery";
 import { lottery } from "./lottery";
-import { hasProperty } from "./utils";
+import { sleep } from "./utils";
 
 const regex = {
 	twitter: {
@@ -199,20 +198,6 @@ const LotteryService: ServiceSchema = {
 			twitter: {
 				type: "object",
 				optional: false,
-				custom: (
-					value: object,
-					errors: any[],
-					schema: any,
-					name: any,
-					parent: any,
-					context: any,
-				): object => {
-					const twitterReq: (keyof ITwitter)[] = ["content", "follow", "like", "retweet"];
-					if (!hasProperty(context.data.twitter, twitterReq)) {
-						errors.push({ type: "twitterFieldRequired" });
-					}
-					return value;
-				},
 				props: {
 					like: {
 						type: "string",
@@ -297,6 +282,7 @@ const LotteryService: ServiceSchema = {
 
 						// call services to pick winner(s)
 						await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.addParticipants`, { lotteryId, participants: wallets });
+						await sleep(15000);
 						await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.pickRandomNumber`, { lotteryId }, { timeout: 0 });
 						await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.pickWinners`, { lotteryId }, { timeout: 0 });
 					}

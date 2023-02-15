@@ -240,8 +240,10 @@ const LotteryService: ServiceSchema = {
 					rewardProportions: distribution_options,
 				};
 
-				// Call service
-				await ctx.call(`v1.${ asset_choice.toLowerCase() }.openLottery`, data);
+				if (process.env.NODE_ENV === "production") {
+					// Call service
+					await ctx.call(`v1.${ asset_choice.toLowerCase() }.openLottery`, data);
+				}
 				
 				// Activate lottery 
 				await (this.actions as ActionSchema).update({ id: savedLottery._id, active: true });
@@ -257,6 +259,9 @@ const LotteryService: ServiceSchema = {
 	 */
 	methods: {
 		async checkIfLotteryExists(assetChoice: string, lotteryId: number) {
+			if (process.env.NODE_ENV === "development") {
+				return true;
+			}
 			return this.broker.call(`v1.${ assetChoice.toLowerCase() }.checkIfLotteryExists`, { lottery_id: lotteryId });
 		},
 		fetchEndedLotteries() {
@@ -265,12 +270,16 @@ const LotteryService: ServiceSchema = {
 
 		async findAndStartLotteries() {
 			const endedLotteries = await this.fetchEndedLotteries();
-			if (endedLotteries) {
+
+			if (endedLotteries && process.env.NODE_ENV === "production") {
+
 				for await (const endedLottery of endedLotteries) {
+					
 					const lotteryExists = await this.checkIfLotteryExists(endedLottery.asset_choice, endedLotteries.lottery_id);
 					const lotteryId = endedLottery.lottery_id;
 
 					if (!lotteryExists) {
+						this.logger.error(`Lottery ${endedLottery._id} does not exist!`);
 						// eslint-disable-next-line no-continue
 						continue;
 					}

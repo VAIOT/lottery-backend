@@ -41,7 +41,8 @@ const LotteryService: ServiceSchema = {
 			"asset_choice",
 			"twitter",
 			"lottery_end",
-			"createdAt"
+			"createdAt",
+			"updatedAt"
 		],
 
 		entityValidator: {

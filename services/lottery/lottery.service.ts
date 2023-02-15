@@ -243,7 +243,8 @@ const LotteryService: ServiceSchema = {
 	hooks: {
 		after: {
 			async create(ctx: Context<LotteryEntity>, savedLottery: LotteryEntity) {
-				const { distribution_method, wallet, num_of_winners, distribution_options, number_of_tokens, final_rewards } = ctx.params;
+				const { distribution_method, wallet, num_of_winners, distribution_options, number_of_tokens, final_rewards, asset_choice } = ctx.params;
+				
 				const data = {
 					lotteryType: distribution_method, // SPLIT OR PERCENTAGE
 					author: wallet,
@@ -253,10 +254,14 @@ const LotteryService: ServiceSchema = {
 					finalRewards: final_rewards,
 					rewardProportions: distribution_options,
 				};
-				await ctx.call("v1.matic.openLottery", data, { timeout: 0 });
-				// It works \/
+
+				// Call service
+				await ctx.call(`v1.${ asset_choice.toLowerCase() }.openLottery`, data);
+				
+				// Activate lottery 
 				await (this.actions as ActionSchema).update({ id: savedLottery._id, active: true });
 
+				// Return lottery 
 				return savedLottery;
 			}
 		}
@@ -266,30 +271,48 @@ const LotteryService: ServiceSchema = {
 	 * Methods
 	 */
 	methods: {
-		async getWinners() {
-			const endedLotteries = await this.fetchEndedLotteries();
-			if (endedLotteries) {
-				for await (const endedLottery of endedLotteries) {
-					const lotteryExist = await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.checkIfLotteryExists`, { lotteryId: endedLotteries.id }, { timeout: 0 });
-					if (!lotteryExist) {
-						// eslint-disable-next-line no-continue
-						continue;
-					}
-
-					const wallets = await this.getParticipants(endedLottery);
-					
-					if (wallets && await this.actions.update({ id: endedLottery._id, active: false })) {
-						const data = { lotteryId: endedLottery.id, participants: wallets };
-
-						await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.addParticipants`, data, { timeout: 0 });
-					}
-				}
-			}
-			setTimeout(this.getWinners, 15 * 60 * 1000); // call after 15 mins // twitter rate limiting 
+		async checkIfLotteryExists(assetChoice: string, lotteryId: number) {
+			return this.broker.call(`v1.${ assetChoice.toLowerCase() }.checkIfLotteryExists`, { lottery_id: lotteryId });
 		},
 		fetchEndedLotteries() {
 			return this.actions.find({ query: { active: true, lottery_end: { $lte: new Date().getTime() } } });
 		},
+
+		async findAndStartLotteries() {
+			const endedLotteries = await this.fetchEndedLotteries();
+			if (endedLotteries) {
+				for await (const endedLottery of endedLotteries) {
+					const lotteryExists = await this.checkIfLotteryExists(endedLottery.asset_choice, endedLotteries.lottery_id);
+					const lotteryId = endedLottery.lottery_id;
+
+					if (!lotteryExists) {
+						// eslint-disable-next-line no-continue
+						continue;
+					}
+
+					// get all wallets of participants
+					const wallets = await this.getParticipants(endedLottery);
+					
+					if (wallets) {
+
+						// call services to pick winner(s)
+						await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.addParticipants`, { lotteryId, participants: wallets });
+						await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.pickRandomNumber`, { lotteryId }, { timeout: 0 });
+						await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.pickWinners`, { lotteryId }, { timeout: 0 });
+					}
+
+					// end lottery and add twitter post
+					await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.getWinnersOfLottery`, { lotteryId }, { timeout: 0 });
+					await this.actions.update({ id: endedLottery._id, active: false });
+
+					// TODO add twitter post
+				}
+			}
+
+			// call after 15 mins // twitter rate limiting
+			setTimeout(this.findAndStartLotteries, 15 * 60 * 1000); 
+		},
+
 		async getParticipants(endedLottery: LotteryEntity) {
 			const { createdAt, twitter } = endedLottery;
 			const { wallet_post, ...reqs } = twitter;
@@ -316,8 +339,16 @@ const LotteryService: ServiceSchema = {
 			}
 			return this.getWallets(participants);
 		},
+
+		/**
+		* A function to get array of wallets from participants or return null if errors occured
+		*/
 		getWallets(participants: any): string[] | null {
+
+			// Check for any errors in participants
 			const hasErrors = participants.some((result: any) => result.errors);
+
+			// Check if fetching is completed
 			const fetchingComplete = participants.every((result: any) => result.complete);
 
 			if (hasErrors || !fetchingComplete) {
@@ -342,7 +373,7 @@ const LotteryService: ServiceSchema = {
 	 * Service started lifecycle event handler
 	 */
 	started() {
-		this.getWinners();
+		this.findAndStartLotteries();
 	},
 
 	/**

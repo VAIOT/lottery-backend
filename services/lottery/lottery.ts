@@ -50,6 +50,8 @@ const lotterySchema = new Schema<LotterySettings>(
 		},
 		final_rewards: {
 			type: [String],
+			required: false,
+			default: undefined
 		},
 		num_of_winners: {
 			type: Number,

@@ -287,20 +287,33 @@ const LotteryService: ServiceSchema = {
 					// get all wallets of participants
 					const wallets = await this.getParticipants(endedLottery);
 					
-					if (wallets) {
+					if (wallets.length > 0) {
 
 						// call services to pick winner(s)
-						await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.addParticipants`, { lotteryId, participants: wallets });
+						await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.addParticipants`, { lotteryId, participants: wallets }, { timeout: 0 });
 						await sleep(15000);
 						await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.pickRandomNumber`, { lotteryId }, { timeout: 0 });
 						await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.pickWinners`, { lotteryId }, { timeout: 0 });
 					}
 
-					// end lottery and add twitter post
-					await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.getWinnersOfLottery`, { lotteryId }, { timeout: 0 });
+					// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+					const winningWallets = await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.getWinnersOfLottery`, { lotteryId }, { timeout: 0 }) as string[];
+
+					const postText = winningWallets.length > 0
+					? `Winning wallets in lottery #${endedLottery.lottery_id} are: ${winningWallets.join(', ')}`
+					: `Lottery #${endedLottery.lottery_id} ended with no winners; No participants.`;
+
+					// Post lottery results to Twitter
+					const postId = await this.broker.call("v1.twitter.addPost", { content: postText }, { timeout: 0 })
+					
+					// Log the post ID
+					this.logger.debug(`Post added! Id: ${postId}.`);
+
+					// Set the lottery's active state to false
 					await this.actions.update({ id: endedLottery._id, active: false });
 
-					// TODO add twitter post
+					// Log ended lottery ID
+					this.logger.debug(`Lottery ended! Id: ${endedLottery._id}.`);
 				}
 			}
 

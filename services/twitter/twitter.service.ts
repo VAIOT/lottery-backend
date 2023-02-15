@@ -99,6 +99,20 @@ const TwitterService: ServiceSchema = {
 				}
 				return this.getParticipants(wallet_post, tweets);
 			}
+		},
+		addPost: {
+			visibility: "protected",
+			rest: {
+				method: 'POST',
+				path: '/addPost'
+			},
+			params: {
+				content: "string"
+			},
+			async handler(ctx: Context<{ content: string }>) {
+				const { content } = ctx.params;
+				return new Twitter().addPost(content);
+			}
 		}
 	},
 

@@ -343,7 +343,7 @@ const LotteryService: ServiceSchema = {
 						participants.push(await this.broker.call("v1.twitter.followers", { wallet_post, user: value }, { timeout: 0 }));
 						break;
 					default:
-						console.log("default", key)
+						participants.push(await this.broker.call("v1.twitter.participants", { wallet_post }, { timeout: 0 }));
 				}
 			}
 			return this.getWallets(participants);

@@ -102,7 +102,7 @@ const TwitterService: ServiceSchema = {
 				return this.getParticipants(wallet_post, tweets);
 			}
 		},
-		getParticipants: {
+		participants: {
 			visibility: "protected",
 			rest: {
 				method: 'GET',

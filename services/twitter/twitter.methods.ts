@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import type { TweetV2, Tweetv2SearchParams, TwitterApiv2, UserV2, UserV2Result} from "twitter-api-v2";
+import type { TweetV2, Tweetv2SearchParams, TwitterApiv2, UserV2, UserV2Result } from "twitter-api-v2";
 import { ApiResponseError, TweetLikingUsersV2Paginator, TweetSearchRecentV2Paginator, TwitterApi, UserFollowersV2Paginator} from "twitter-api-v2";
 import { SEARCH_TYPE } from "./enums";
 import type { Paginator } from "./interfaces/twitter";
@@ -88,12 +88,12 @@ export default class Twitter {
      * Retrieve followers for given user
      * @param user username of the user
     */
-    async getFollowers(user: string): Promise<UserFollowersV2Paginator | UserV2Result | Partial<{ data: UserV2[] | TweetV2[]; errors: unknown[]; complete: boolean; }>> {
+    async getFollowers(user: string): Promise<Partial<{ data: UserV2[]; errors: unknown[]; complete: boolean; }>> {
         const completeQuery = `Followers:${user}`;
         const userData = await this.getUserData(user);
 
         if (userData.errors) {
-            return userData;
+            return { errors: userData.errors };
         }
         
         let followers = await this.loadPaginator(completeQuery, UserFollowersV2Paginator.prototype);
@@ -101,11 +101,13 @@ export default class Twitter {
             followers = await this.api.followers(userData.data.id, { asPaginator: true });
 
             if (followers.errors.length > 0) {
-                return followers;
+                return { errors: followers.errors };
             }
         }
 
-        return this.iteratePaginator(followers, completeQuery, 1000);
+        const { data, errors, complete } = await this.iteratePaginator(followers, completeQuery, 1000);
+
+        return { data: (data as UserV2[]), errors, complete }
     }
 
     /**

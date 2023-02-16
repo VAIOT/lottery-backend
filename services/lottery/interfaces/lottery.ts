@@ -25,4 +25,4 @@ export interface IERC721 extends ILotteryBase {
 	}[];
 }
 
-export interface IMATIC extends ILotteryBase {}
+export type IMATIC = ILotteryBase;

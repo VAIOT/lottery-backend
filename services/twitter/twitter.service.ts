@@ -1,7 +1,9 @@
+/* eslint-disable no-continue */
 /* eslint-disable @typescript-eslint/naming-convention */
 import events from "events";
 import type { Context, ServiceSchema } from "moleculer";
 import mongoose from "mongoose";
+import Botometer from "./botometer";
 import type { Account, Post, PostContent } from "./interfaces/twitter";
 import Twitter from "./twitter.methods";
 
@@ -100,6 +102,20 @@ const TwitterService: ServiceSchema = {
 				return this.getParticipants(wallet_post, tweets);
 			}
 		},
+		getParticipants: {
+			visibility: "protected",
+			rest: {
+				method: 'GET',
+				path: '/participants'
+			},
+			params: {
+				wallet_post: "string"
+			},
+			handler(ctx: Context<{ wallet_post: string }>) {
+				const { wallet_post } = ctx.params;
+				return this.getParticipants(wallet_post);
+			}
+		},
 		addPost: {
 			visibility: "protected",
 			rest: {
@@ -125,7 +141,7 @@ const TwitterService: ServiceSchema = {
 	 * Methods
 	 */
 	methods: {
-		async getParticipants(walletsPostUrl: string, results: any): Promise<Partial<{ wallets: string[], errors: any, complete?: boolean}>> {
+		async getParticipants(walletsPostUrl: string, results?: any): Promise<Partial<{ wallets: string[], errors: any, complete?: boolean}>> {
 			const twitterInstance =  new Twitter();
 
 			// wallets
@@ -138,19 +154,36 @@ const TwitterService: ServiceSchema = {
 				return tweetWithAuthor;
 			}
 
-			tweetComments.data = tweetComments.data
-			// leave the wallet post of user who participated in the lottery
-			.filter((result: any) => results.data.some((wallet: any) => result.author_id ?? result.id === wallet.author_id))
+			if (results) {
+				// leave the wallet post of user who participated in the lottery
+				tweetComments.data = tweetComments.data.filter((result: any) => results.data.some((wallet: any) => result.author_id ?? result.id === wallet.author_id))
+			}
+			
 			// exclude lottery owner
-			.filter((wallet: any) => wallet.author_id !== tweetWithAuthor.data.author_id);
+			tweetComments.data = tweetComments.data.filter((wallet: any) => wallet.author_id !== tweetWithAuthor.data.author_id);
 
-			const casualExtermination = this.filterBots(tweetComments);
+			const casualExtermination = await this.filterBots(tweetComments);
 
 			return casualExtermination;
 		},
-		filterBots(results: any) {
-			return results;
+
+		async filterBots(results: any) {
+			const realUsers: any[] = [];
+			
+			for await (const result of results.data) {
+				const userId = result.author_id ?? result.id;
+
+				const botometer = await new Botometer().getScoreFor(userId);
+
+				if (botometer.cap.universal > 0.94) {
+					continue;
+				}
+
+				realUsers.push(result);
+			}
+			return realUsers;
 		},
+
 		async getLikedAndCommented(postUrl: string) {
 			const twitterInstance = new Twitter();
 
@@ -169,6 +202,7 @@ const TwitterService: ServiceSchema = {
 
 			return comments;
 		},
+
 		async getRetweets(postUrl: string) {
 			const twitterInstance = new Twitter();
 
@@ -187,9 +221,11 @@ const TwitterService: ServiceSchema = {
 
 			return { data, complete: retweets.complete };
 		},
+
 		async findTweetsWithContent(content: string, dateFrom: Date) {
 			return new Twitter().findTweetsWithContent(content, dateFrom);
 		},
+
 		async getFollowers(user: string) {
 			return new Twitter().getFollowers(user);
 		}

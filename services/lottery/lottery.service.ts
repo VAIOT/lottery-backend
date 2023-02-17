@@ -1,3 +1,4 @@
+/* eslint-disable no-continue */
 /* eslint-disable @typescript-eslint/naming-convention */
 /* eslint-disable @typescript-eslint/no-implied-eval */
 import type { ActionSchema, Context, LoggerInstance, ServiceSchema } from "moleculer";
@@ -87,7 +88,6 @@ const LotteryService: ServiceSchema = {
 					if (context.data.asset_choice !== TOKEN_TYPE.ERC721) {
 						if (value) {
 							if (context.data.distribution_method === TOKEN_DISTRIBUTION_METHOD.PERCENTAGE) {
-								console.log(value)
 								if (value.reduce((sum, val) => sum + Number(val.slice(0,2)), 0) === 100) {
 									return value;
 								}
@@ -230,9 +230,15 @@ const LotteryService: ServiceSchema = {
 	hooks: {
 		after: {
 			async create(ctx: Context<LotteryEntity>, savedLottery: LotteryEntity) {
-				const { distribution_method, wallet, num_of_winners, distribution_options, number_of_tokens, final_rewards, asset_choice } = ctx.params;
+				const { 
+					distribution_method, 
+					wallet, num_of_winners,
+					distribution_options, 
+					number_of_tokens, 
+					final_rewards, 
+					asset_choice } = ctx.params;
 				
-				// TODO fix this
+				// TODO fix this later
 				const logger = (this.logger as unknown as LoggerInstance);
 				
 				logger.debug(`Lottery #${savedLottery._id} saved in db.`);
@@ -291,16 +297,21 @@ const LotteryService: ServiceSchema = {
 
 					let { wallets } = (await this.actions.find({ query: { _id: endedLottery._id } }))[0];
 
-					if (!wallets) {
+					if (wallets.length > 0) {
+						this.logger.debug(`Found ${wallets.length} wallets in db.`);
+					} else {
 						// Get wallets of all participants
 						wallets = await this.getParticipants(endedLottery);
+
+						console.log(wallets)
+						if (!wallets) {
+							continue;
+						}
 
 						// Save wallets to db in case of failure
 						await this.actions.update({ id: endedLottery._id, wallets });
 
 						this.logger.debug(`Saved ${wallets.length} wallets to db.`);
-					} else {
-						this.logger.debug(`Found ${wallets.length} wallets in db.`);
 					}
 					
 					if (process.env.NODE_ENV === "production") {
@@ -310,7 +321,6 @@ const LotteryService: ServiceSchema = {
 
 						if (!lotteryExists) {
 							this.logger.error(`Lottery ${endedLottery._id} does not exist in ${endedLottery.asset_choice.toLowerCase()} service!`);
-							// eslint-disable-next-line no-continue
 							continue;
 						}
 						
@@ -337,7 +347,7 @@ const LotteryService: ServiceSchema = {
 				}
 			}
 
-			// call after 15 mins // twitter rate limiting
+			// Call after 15 mins // twitter rate limiting
 			setTimeout(this.findAndStartEndedLotteries, 15 * 60 * 1000); 
 		},
 
@@ -356,54 +366,64 @@ const LotteryService: ServiceSchema = {
 
 		async getParticipants(endedLottery: LotteryEntity) {
 			const { createdAt, twitter } = endedLottery;
-			const { wallet_post } = twitter;
-			const twitterRequirements = Object.entries(twitter);
-		
+			const { wallet_post, ...reqs } = twitter;
+			const twitterRequirements = Object.entries(reqs);
 
-			const participants = [];
+
+			const baseParticipants = await this.broker.call("v1.twitter.participants", { wallet_post }, { timeout: 0 }) as any;
+
+			if (baseParticipants.errors || !baseParticipants.complete) {
+				this.logger.error(baseParticipants.errors ?? 'Fetching not completed');
+
+				return null;
+			}
+		
 			for await (const [key, value] of twitterRequirements) {
 				this.logger.debug(`Getting participants, key: ${key} value: ${value}.`);
+
+				let participants: { data?: any[], errors?: unknown, complete?: boolean } = {};
 				switch (key) {
 					case "like":
-						participants.push(await this.broker.call("v1.twitter.likes", { wallet_post, post_url: value }, { timeout: 0 }));
+						participants = await this.broker.call("v1.twitter.likes", { wallet_post, post_url: value }, { timeout: 0 });
 						break;
 					case "content":
-						participants.push(await this.broker.call("v1.twitter.content", { wallet_post, content: value, date_from: createdAt }, { timeout: 0 }));
+						participants = await this.broker.call("v1.twitter.content", { wallet_post, content: value, date_from: createdAt }, { timeout: 0 });
 						break;
 					case "retweet":
-						participants.push(await this.broker.call("v1.twitter.retweets", { wallet_post, post_url: value }, { timeout: 0 }));
+						participants = await this.broker.call("v1.twitter.retweets", { wallet_post, post_url: value }, { timeout: 0 });
 						break;
 					case "follow":
-						participants.push(await this.broker.call("v1.twitter.followers", { wallet_post, user: value }, { timeout: 0 }));
+						participants = await this.broker.call("v1.twitter.followers", { wallet_post, user: value }, { timeout: 0 });
 						break;
 					default:
-						participants.push(await this.broker.call("v1.twitter.participants", { wallet_post }, { timeout: 0 }));
+						this.logger.error(`Unknown key ${key}`);
 				}
+
+				if (participants.errors || !participants.complete) {
+					this.logger.error(participants.errors ?? 'Fetching not completed');
+
+					return null;
+				}
+
+				// Keep users who participated in twitter activity
+				baseParticipants.data = baseParticipants.data.filter((comment: any, index: any, self: any) => 
+					participants.data!.some((participant: any) => comment.author_id === participant.author_id ?? participant.id));
 			}
-			return this.getWallets(participants);
+			
+			return this.getWallets(baseParticipants);
 		},
 
 		/**
 		* A function to get array of wallets from participants or return null if errors occured
 		*/
-		getWallets(participants: any): string[] | null {
-
-			// Check for any errors in participants
-			const hasErrors = participants.some((result: any) => result.errors);
-
-			// Check if fetching is completed
-			const fetchingComplete = participants.every((result: any) => result.complete);
-
-			if (hasErrors || !fetchingComplete) {
-				// Log errors
-				this.logger.error(participants.map((result: any) => result.errors));
-				return null;
-			}
+		getWallets(participants: any[]): string[] | null {
+			this.logger.debug('Getting wallets from comments.');
 
 			// Get wallets from content
 			return participants
-			.flatMap(({data}: any) => data
-			.map(({text}: any) => text.match(regex.wallet)?.[0]));
+			.flatMap(({text}: any) => text.match(regex.wallet)?.[0])
+			// Remove duplicated wallets
+			.find((wallet, index, self) => self.indexOf(wallet) === index);
 		}
 	},
 

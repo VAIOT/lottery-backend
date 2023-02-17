@@ -37,6 +37,7 @@ const LotteryService: ServiceSchema = {
 			"number_of_tokens",
 			"distribution_options",
 			"fees_amount",
+			"wallets",
 			"num_of_winners",
 			"asset_choice",
 			"twitter",
@@ -283,10 +284,24 @@ const LotteryService: ServiceSchema = {
 			this.logger.debug(`Looking for ended lotteries...`);
 			const endedLotteries = await this.fetchEndedLotteries();
 
-			if (endedLotteries) {
+			if (endedLotteries.length > 0) {
 				this.logger.debug(`Found ${endedLotteries.length} ended lotteries.`);
 
-				for await (const endedLottery of endedLotteries) {
+				for await (const endedLottery of endedLotteries as LotteryEntity[]) {
+
+					let { wallets } = (await this.actions.find({ query: { _id: endedLottery._id } }))[0];
+
+					if (!wallets) {
+						// Get wallets of all participants
+						wallets = await this.getParticipants(endedLottery);
+
+						// Save wallets to db in case of failure
+						await this.actions.update({ id: endedLottery._id, wallets });
+
+						this.logger.debug(`Saved ${wallets.length} wallets to db.`);
+					} else {
+						this.logger.debug(`Found ${wallets.length} wallets in db.`);
+					}
 					
 					if (process.env.NODE_ENV === "production") {
 
@@ -294,13 +309,10 @@ const LotteryService: ServiceSchema = {
 						const lotteryId = endedLottery.lottery_id;
 
 						if (!lotteryExists) {
-							this.logger.error(`Lottery ${endedLottery._id} does not exist in ${endedLottery.assetChoice.toLowerCase()} service!`);
+							this.logger.error(`Lottery ${endedLottery._id} does not exist in ${endedLottery.asset_choice.toLowerCase()} service!`);
 							// eslint-disable-next-line no-continue
 							continue;
 						}
-
-						// get all wallets of participants
-						const wallets = await this.getParticipants(endedLottery);
 						
 						if (wallets.length > 0) {
 
@@ -344,11 +356,13 @@ const LotteryService: ServiceSchema = {
 
 		async getParticipants(endedLottery: LotteryEntity) {
 			const { createdAt, twitter } = endedLottery;
-			const { wallet_post, ...reqs } = twitter;
-			const twitterRequirements = Object.entries(reqs);
+			const { wallet_post } = twitter;
+			const twitterRequirements = Object.entries(twitter);
+		
 
 			const participants = [];
 			for await (const [key, value] of twitterRequirements) {
+				this.logger.debug(`Getting participants, key: ${key} value: ${value}.`);
 				switch (key) {
 					case "like":
 						participants.push(await this.broker.call("v1.twitter.likes", { wallet_post, post_url: value }, { timeout: 0 }));

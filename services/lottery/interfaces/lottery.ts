@@ -7,6 +7,7 @@ interface ILotteryBase {
 	distribution_options: string[];
 	number_of_tokens: string;
 	wallet: string;
+	wallets?: string[];
 	fees_amount: string;
 	num_of_winners: number;
 	asset_choice: TOKEN_TYPE;

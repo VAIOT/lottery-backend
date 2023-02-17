@@ -168,10 +168,12 @@ const TwitterService: ServiceSchema = {
 		},
 
 		async filterBots(results: any) {
-			const realUsers: any[] = [];
+			const realUsers: { data: any[], complete: boolean} = { data: [], complete: results.complete};
 			
 			for await (const result of results.data) {
 				const userId = result.author_id ?? result.id;
+
+				this.logger.debug(`Bot checking user: ${userId}`);
 
 				const botometer = await new Botometer().getScoreFor(userId);
 
@@ -179,7 +181,7 @@ const TwitterService: ServiceSchema = {
 					continue;
 				}
 
-				realUsers.push(result);
+				realUsers.data.push(result);
 			}
 			return realUsers;
 		},

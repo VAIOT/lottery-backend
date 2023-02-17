@@ -48,6 +48,10 @@ const lotterySchema = new Schema<LotterySettings>(
 			type: String,
 			required: true,
 		},
+		wallets: {
+			type: [String],
+			required: false
+		},
 		final_rewards: {
 			type: [String],
 			required: false,

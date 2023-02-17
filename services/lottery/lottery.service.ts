@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 /* eslint-disable @typescript-eslint/no-implied-eval */
-import type { ActionSchema, Context, ServiceSchema } from "moleculer";
+import type { ActionSchema, Context, LoggerInstance, ServiceSchema } from "moleculer";
 import DbService from "moleculer-db";
 import MongooseAdapter from "moleculer-db-adapter-mongoose";
 import { ERC20_TYPE, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from "./enums";
@@ -230,6 +230,11 @@ const LotteryService: ServiceSchema = {
 			async create(ctx: Context<LotteryEntity>, savedLottery: LotteryEntity) {
 				const { distribution_method, wallet, num_of_winners, distribution_options, number_of_tokens, final_rewards, asset_choice } = ctx.params;
 				
+				// TODO fix this
+				const logger = (this.logger as unknown as LoggerInstance);
+				
+				logger.debug(`Lottery #${savedLottery._id} saved in db.`);
+
 				const data = {
 					lotteryType: distribution_method, // SPLIT OR PERCENTAGE
 					author: wallet,
@@ -241,8 +246,11 @@ const LotteryService: ServiceSchema = {
 				};
 
 				if (process.env.NODE_ENV === "production") {
+					logger.debug(`Lottery #${savedLottery._id} opening...`);
 					// Call service
 					await ctx.call(`v1.${ asset_choice.toLowerCase() }.openLottery`, data);
+
+					logger.debug(`Lottery #${savedLottery._id} opened.`);
 				}
 				
 				// Activate lottery 
@@ -265,49 +273,48 @@ const LotteryService: ServiceSchema = {
 			return this.broker.call(`v1.${ assetChoice.toLowerCase() }.checkIfLotteryExists`, { lottery_id: lotteryId });
 		},
 		fetchEndedLotteries() {
-			return this.actions.find({ query: { active: true, lottery_end: { $lte: new Date().getTime() } } });
+			const timezoneOffsetMS = new Date().getTime() + -new Date().getTimezoneOffset() * 60 * 1000;
+			return this.actions.find({ query: { active: true, lottery_end: { $lte: new Date(timezoneOffsetMS) } } });
 		},
 
-		async findAndStartLotteries() {
+		async findAndStartEndedLotteries() {
+
+			this.logger.debug(`Looking for ended lotteries...`);
 			const endedLotteries = await this.fetchEndedLotteries();
 
-			if (endedLotteries && process.env.NODE_ENV === "production") {
+			if (endedLotteries) {
+				this.logger.debug(`Found ${endedLotteries.length} ended lotteries.`);
 
 				for await (const endedLottery of endedLotteries) {
 					
-					const lotteryExists = await this.checkIfLotteryExists(endedLottery.asset_choice, endedLotteries.lottery_id);
-					const lotteryId = endedLottery.lottery_id;
+					if (process.env.NODE_ENV === "production") {
 
-					if (!lotteryExists) {
-						this.logger.error(`Lottery ${endedLottery._id} does not exist!`);
-						// eslint-disable-next-line no-continue
-						continue;
-					}
+						const lotteryExists = await this.checkIfLotteryExists(endedLottery.asset_choice, endedLotteries.lottery_id);
+						const lotteryId = endedLottery.lottery_id;
 
-					// get all wallets of participants
-					const wallets = await this.getParticipants(endedLottery);
+						if (!lotteryExists) {
+							this.logger.error(`Lottery ${endedLottery._id} does not exist in ${endedLottery.assetChoice.toLowerCase()} service!`);
+							// eslint-disable-next-line no-continue
+							continue;
+						}
+
+						// get all wallets of participants
+						const wallets = await this.getParticipants(endedLottery);
+						
+						if (wallets.length > 0) {
+
+							// call services to pick winner(s)
+							await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.addParticipants`, { lotteryId, participants: wallets }, { timeout: 0 });
+							await sleep(15000);
+							await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.pickRandomNumber`, { lotteryId }, { timeout: 0 });
+							await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.pickWinners`, { lotteryId }, { timeout: 0 });
+						}
+
+						// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+						const winningWallets = await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.getWinnersOfLottery`, { lotteryId }, { timeout: 0 }) as string[];
 					
-					if (wallets.length > 0) {
-
-						// call services to pick winner(s)
-						await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.addParticipants`, { lotteryId, participants: wallets }, { timeout: 0 });
-						await sleep(15000);
-						await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.pickRandomNumber`, { lotteryId }, { timeout: 0 });
-						await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.pickWinners`, { lotteryId }, { timeout: 0 });
+						this.addEndedLotteryPost(winningWallets, endedLottery.asset_choice.toLowerCase(), endedLottery.lottery_id);
 					}
-
-					// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-					const winningWallets = await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.getWinnersOfLottery`, { lotteryId }, { timeout: 0 }) as string[];
-
-					const postText = winningWallets.length > 0
-					? `Winning wallets in lottery #${endedLottery.lottery_id} are: ${winningWallets.join(', ')}`
-					: `Lottery #${endedLottery.lottery_id} ended with no winners; No participants.`;
-
-					// Post lottery results to Twitter
-					const postId = await this.broker.call("v1.twitter.addPost", { content: postText }, { timeout: 0 })
-					
-					// Log the post ID
-					this.logger.debug(`Post added! Id: ${postId}.`);
 
 					// Set the lottery's active state to false
 					await this.actions.update({ id: endedLottery._id, active: false });
@@ -318,7 +325,20 @@ const LotteryService: ServiceSchema = {
 			}
 
 			// call after 15 mins // twitter rate limiting
-			setTimeout(this.findAndStartLotteries, 15 * 60 * 1000); 
+			setTimeout(this.findAndStartEndedLotteries, 15 * 60 * 1000); 
+		},
+
+		async addEndedLotteryPost(winningWallets: string[], lotteryAsset: string, lotteryId: number) {
+			
+			const postText = winningWallets.length > 0
+			? `Winning wallets in lottery #${lotteryId} asset: ${lotteryAsset} are: ${winningWallets.join(', ')}`
+			: `Lottery #${lotteryId} asset: ${lotteryAsset} ended with no winners; No participants.`;
+
+			// Post lottery results to Twitter
+			const postId = await this.broker.call("v1.twitter.addPost", { content: postText }, { timeout: 0 });
+									
+			// Log the post ID
+			this.logger.debug(`Post added! Id: ${postId}.`);
 		},
 
 		async getParticipants(endedLottery: LotteryEntity) {
@@ -381,7 +401,7 @@ const LotteryService: ServiceSchema = {
 	 * Service started lifecycle event handler
 	 */
 	started() {
-		this.findAndStartLotteries();
+		this.findAndStartEndedLotteries();
 	},
 
 	/**

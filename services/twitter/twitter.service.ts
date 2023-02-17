@@ -28,17 +28,11 @@ const TwitterService: ServiceSchema = {
 				path: '/likes'
 			},
 			params: {
-				wallet_post: "string",
 				post_url: "string"
 			},
-			async handler(ctx: Context<Post>) {
-				const { post_url, wallet_post } = ctx.params;
-
-				const likes = await this.getLikedAndCommented(post_url);
-				if (likes.errors) {
-					return likes;
-				}
-				return this.getParticipants(wallet_post, likes);
+			handler(ctx: Context<Post>) {
+				const { post_url} = ctx.params;
+				return this.getLikedAndCommented(post_url);
 			}
 		},
 		retweets: {
@@ -48,17 +42,11 @@ const TwitterService: ServiceSchema = {
 				path: '/retweets'
 			},
 			params: {
-				wallet_post: "string",
 				post_url: "string"
 			},
-			async handler(ctx: Context<Post>) {
-				const { post_url, wallet_post } = ctx.params;
-
-				const retweets = await this.getRetweets(post_url);
-				if (retweets.errors) {
-					return retweets;
-				}
-				return this.getParticipants(wallet_post, retweets);
+			handler(ctx: Context<Post>) {
+				const { post_url } = ctx.params;
+				return this.getRetweets(post_url);
 			}
 		},
 		followers: {
@@ -68,17 +56,12 @@ const TwitterService: ServiceSchema = {
 				path: '/followers'
 			},
 			params: {
-				wallet_post: "string",
 				user: "string"
 			},
-			async handler(ctx: Context<Account>) {
-				const { user, wallet_post } = ctx.params;
+			handler(ctx: Context<Account>) {
+				const { user } = ctx.params;
 
-				const followers = await this.getFollowers(user);
-				if (followers.errors) {
-					return followers;
-				}
-				return this.getParticipants(wallet_post, followers);
+				return this.getFollowers(user);
 			}
 		},
 		content: {
@@ -88,18 +71,13 @@ const TwitterService: ServiceSchema = {
 				path: '/content'
 			},
 			params: {
-				wallet_post: "string",
 				content: "string",
 				date_from: "date"
 			},
-			async handler(ctx: Context<PostContent>) {
-				const { content, date_from, wallet_post } = ctx.params;
+			handler(ctx: Context<PostContent>) {
+				const { content, date_from } = ctx.params;
 
-				const tweets = await this.findTweetsWithContent(content, date_from);
-				if (tweets.errors) {
-					return tweets;
-				}
-				return this.getParticipants(wallet_post, tweets);
+				return this.findTweetsWithContent(content, date_from);
 			}
 		},
 		participants: {
@@ -109,11 +87,11 @@ const TwitterService: ServiceSchema = {
 				path: '/participants'
 			},
 			params: {
-				wallet_post: "string"
+				wallet_post: "string",
 			},
 			handler(ctx: Context<{ wallet_post: string }>) {
 				const { wallet_post } = ctx.params;
-				return this.getParticipants(wallet_post);
+				return this.getFilteredComments(wallet_post);
 			}
 		},
 		addPost: {
@@ -141,30 +119,34 @@ const TwitterService: ServiceSchema = {
 	 * Methods
 	 */
 	methods: {
-		async getParticipants(walletsPostUrl: string, results?: any): Promise<Partial<{ wallets: string[], errors: any, complete?: boolean}>> {
+		/**
+		 * Filter bots from comments and optionally compare commenting users from basePost and results array
+		 */
+		async getFilteredComments(basePostUrl: string): Promise<Partial<{ wallets: string[], errors: any, complete?: boolean}>> {
 			const twitterInstance =  new Twitter();
 
 			// wallets
-			const tweetComments = await twitterInstance.getTweetComments(walletsPostUrl);
+			const tweetComments = await twitterInstance.getTweetComments(basePostUrl);
 			if (tweetComments.errors) {
 				return tweetComments;
 			}
-			const tweetWithAuthor = await twitterInstance.getTweetAuthor(walletsPostUrl);
+			const tweetWithAuthor = await twitterInstance.getTweetAuthor(basePostUrl);
 			if (tweetWithAuthor.errors) {
 				return tweetWithAuthor;
-			}
-
-			if (results) {
-				// leave the wallet post of user who participated in the lottery
-				tweetComments.data = tweetComments.data.filter((result: any) => results.data.some((wallet: any) => result.author_id ?? result.id === wallet.author_id))
 			}
 			
 			// exclude lottery owner
 			tweetComments.data = tweetComments.data.filter((wallet: any) => wallet.author_id !== tweetWithAuthor.data.author_id);
 
+			tweetComments.data = this.removeDuplicatedUserEntries(tweetComments.data);
+
 			const casualExtermination = await this.filterBots(tweetComments);
 
 			return casualExtermination;
+		},
+
+		removeDuplicatedUserEntries(entries: any[]) {
+			return entries.filter((entry, index, self) => self.findIndex(({author_id}) => entry.author_id === author_id) === index);
 		},
 
 		async filterBots(results: any) {
@@ -173,11 +155,11 @@ const TwitterService: ServiceSchema = {
 			for await (const result of results.data) {
 				const userId = result.author_id ?? result.id;
 
-				this.logger.debug(`Bot checking user: ${userId}`);
+				this.logger.debug(`Getting bot score for: ${userId}`);
 
 				const botometer = await new Botometer().getScoreFor(userId);
 
-				if (botometer.cap.universal > 0.94) {
+				if (botometer.cap?.universal > 0.94) {
 					continue;
 				}
 

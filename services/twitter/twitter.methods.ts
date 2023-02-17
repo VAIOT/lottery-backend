@@ -186,7 +186,7 @@ export default class Twitter {
             await this.savePaginator(key, paginator);
         }
 
-        return { data: paginator.data.data, complete: paginator.done }
+        return { data: paginator.data.data ?? [], complete: paginator.done }
     }
 
     private async savePaginator(key: string, paginator: Paginator) {

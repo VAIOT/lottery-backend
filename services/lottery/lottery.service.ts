@@ -249,7 +249,8 @@ const LotteryService: ServiceSchema = {
 				if (process.env.NODE_ENV === "production") {
 					logger.debug(`Lottery #${savedLottery._id} opening...`);
 					// Call service
-					await ctx.call(`v1.${ asset_choice.toLowerCase() }.openLottery`, data);
+					const serviceName = (asset_choice === TOKEN_TYPE.MATIC ? 'matic' : 'erc').toLowerCase();
+					await ctx.call(`v1.${ serviceName }.openLottery`, data);
 
 					logger.debug(`Lottery #${savedLottery._id} opened.`);
 				}
@@ -267,11 +268,11 @@ const LotteryService: ServiceSchema = {
 	 * Methods
 	 */
 	methods: {
-		async checkIfLotteryExists(assetChoice: string, lotteryId: number) {
+		async checkIfLotteryExists(serviceName: string, lotteryId: number) {
 			if (process.env.NODE_ENV === "development") {
 				return true;
 			}
-			return this.broker.call(`v1.${ assetChoice.toLowerCase() }.checkIfLotteryExists`, { lottery_id: lotteryId });
+			return this.broker.call(`v1.${ serviceName }.checkIfLotteryExists`, { lottery_id: lotteryId });
 		},
 		fetchEndedLotteries() {
 			const timezoneOffsetMS = new Date().getTime() + -new Date().getTimezoneOffset() * 60 * 1000;
@@ -304,28 +305,29 @@ const LotteryService: ServiceSchema = {
 					
 					if (process.env.NODE_ENV === "production") {
 
-						const lotteryExists = await this.checkIfLotteryExists(endedLottery.asset_choice, endedLotteries.lottery_id);
+						const serviceName = (endedLottery.asset_choice === TOKEN_TYPE.MATIC ? 'matic' : 'erc').toLowerCase();
+
+						const lotteryExists = await this.checkIfLotteryExists(serviceName, endedLotteries.lottery_id);
 						const lotteryId = endedLottery.lottery_id;
 
 						if (!lotteryExists) {
-							this.logger.error(`Lottery ${endedLottery._id} does not exist in ${endedLottery.asset_choice.toLowerCase()} service!`);
-							// eslint-disable-next-line no-continue
+							this.logger.error(`Lottery ${endedLottery._id} does not exist in ${serviceName} service!`);
 							continue;
 						}
 						
 						if (wallets.length > 0) {
 
 							// call services to pick winner(s)
-							await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.addParticipants`, { lotteryId, participants: wallets }, { timeout: 0 });
+							await this.broker.call(`v1.${ serviceName }.addParticipants`, { lotteryId, participants: wallets }, { timeout: 0 });
 							await sleep(15000);
-							await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.pickRandomNumber`, { lotteryId }, { timeout: 0 });
-							await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.pickWinners`, { lotteryId }, { timeout: 0 });
+							await this.broker.call(`v1.${ serviceName }.pickRandomNumber`, { lotteryId }, { timeout: 0 });
+							await this.broker.call(`v1.${ serviceName }.pickWinners`, { lotteryId }, { timeout: 0 });
 						}
 
 						// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-						const winningWallets = await this.broker.call(`v1.${ endedLottery.asset_choice.toLowerCase() }.getWinnersOfLottery`, { lotteryId }, { timeout: 0 }) as string[];
+						const winningWallets = await this.broker.call(`v1.${ serviceName }.getWinnersOfLottery`, { lotteryId }, { timeout: 0 }) as string[];
 					
-						this.addEndedLotteryPost(winningWallets, endedLottery.asset_choice.toLowerCase(), endedLottery.lottery_id);
+						this.addEndedLotteryPost(winningWallets, serviceName, endedLottery.lottery_id);
 					}
 
 					// Set the lottery's active state to false

@@ -123,7 +123,7 @@ const TwitterService: ServiceSchema = {
 		 * Filter bots from comments and optionally compare commenting users from basePost and results array
 		 */
 		async getFilteredComments(basePostUrl: string): Promise<Partial<{ wallets: string[], errors: any, complete?: boolean}>> {
-			const twitterInstance =  new Twitter();
+			const twitterInstance = new Twitter();
 
 			// wallets
 			const tweetComments = await twitterInstance.getTweetComments(basePostUrl);
@@ -135,7 +135,7 @@ const TwitterService: ServiceSchema = {
 				return tweetWithAuthor;
 			}
 			
-			// exclude lottery owner
+			// Remove tweet author
 			tweetComments.data = tweetComments.data.filter((wallet: any) => wallet.author_id !== tweetWithAuthor.data.author_id);
 
 			tweetComments.data = this.removeDuplicatedUserEntries(tweetComments.data);
@@ -160,6 +160,7 @@ const TwitterService: ServiceSchema = {
 				const botometer = await new Botometer().getScoreFor(userId);
 
 				if (botometer.cap?.universal > 0.94) {
+					this.logger.debug(`User removed from lottery: ${userId}`);
 					continue;
 				}
 
@@ -201,7 +202,7 @@ const TwitterService: ServiceSchema = {
 				return retweets;
 			}
 
-			const data = retweets.data.filter(({author_id}: {author_id: string}) => author_id !== tweetWithAuthor.data.author_id);
+			const data = retweets.data.filter((retweet: any) => retweet.id !== tweetWithAuthor.data.author_id);
 
 			return { data, complete: retweets.complete };
 		},

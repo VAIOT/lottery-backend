@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import type { TweetV2, Tweetv2SearchParams, TwitterApiv2, UserV2, UserV2Result } from "twitter-api-v2";
-import { ApiResponseError, TweetLikingUsersV2Paginator, TweetSearchRecentV2Paginator, TwitterApi, UserFollowersV2Paginator} from "twitter-api-v2";
+import { ApiResponseError, TweetLikingUsersV2Paginator, TweetRetweetersUsersV2Paginator, TweetSearchRecentV2Paginator, TwitterApi, UserFollowersV2Paginator} from "twitter-api-v2";
 import { SEARCH_TYPE } from "./enums";
 import type { Paginator } from "./interfaces/twitter";
 import twitter from "./twitter.schema";
@@ -72,7 +72,7 @@ export default class Twitter {
         if (postId.errors) {
             return postId;
         }
-        return this.searchTweets(postId.data, { "tweet.fields": ["author_id"] }, SEARCH_TYPE.URL);
+        return this.searchRetweets(postId.data);
     }
 
     /**
@@ -137,6 +137,24 @@ export default class Twitter {
         }
 
         return this.iteratePaginator(search, completeQuery);
+    }
+
+    private async searchRetweets(postId: string) {
+        const completeQuery = `Retweets:${postId}`;
+
+        let retweets = await this.loadPaginator(completeQuery, TweetRetweetersUsersV2Paginator.prototype);
+
+        if (!retweets) {
+            retweets = await this.api.tweetRetweetedBy(postId, { asPaginator: true });
+
+            if (retweets.errors.length > 0) {
+                return { errors: retweets.errors };
+            } if (retweets.meta.result_count === 0) {
+                return { data: [], complete: true }
+            }
+        }
+
+        return this.iteratePaginator(retweets, completeQuery);
     }
 
     private async getTweetData(postUrl: string, fields?: Partial<Tweetv2SearchParams>) {

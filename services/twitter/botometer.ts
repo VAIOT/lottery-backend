@@ -104,7 +104,7 @@ export default class Botometer {
       return res.body;
     } catch (e) {
       console.log(e);
-      throw new Error(e);
+      return { error: e };
     }
   }
 

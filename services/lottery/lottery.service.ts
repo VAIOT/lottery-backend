@@ -303,7 +303,6 @@ const LotteryService: ServiceSchema = {
 						// Get wallets of all participants
 						wallets = await this.getParticipants(endedLottery);
 
-						console.log(wallets)
 						if (!wallets) {
 							continue;
 						}
@@ -406,24 +405,22 @@ const LotteryService: ServiceSchema = {
 				}
 
 				// Keep users who participated in twitter activity
-				baseParticipants.data = baseParticipants.data.filter((comment: any, index: any, self: any) => 
-					participants.data!.some((participant: any) => comment.author_id === participant.author_id ?? participant.id));
+				baseParticipants.data = baseParticipants.data.filter((comment: any, index: any, self: any) =>
+					participants.data!.some((participant: any) => comment.author_id === (participant.author_id ?? participant.id))
+				);
 			}
-			
 			return this.getWallets(baseParticipants);
 		},
 
 		/**
 		* A function to get array of wallets from participants or return null if errors occured
 		*/
-		getWallets(participants: any[]): string[] | null {
-			this.logger.debug('Getting wallets from comments.');
+		getWallets(participants: any): string[] | null {
+			this.logger.debug('Fetching wallets from comments.');
 
-			// Get wallets from content
-			return participants
-			.flatMap(({text}: any) => text.match(regex.wallet)?.[0])
-			// Remove duplicated wallets
-			.find((wallet, index, self) => self.indexOf(wallet) === index);
+			// Get wallets from content and remove duplicated wallets
+			return Array.from(new Set(participants.data
+				.flatMap(({text}: any) => text.match(regex.wallet)?.[0])));
 		}
 	},
 

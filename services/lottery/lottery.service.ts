@@ -280,7 +280,7 @@ const LotteryService: ServiceSchema = {
 			if (process.env.NODE_ENV === "development") {
 				return true;
 			}
-			return this.broker.call(`v1.${ serviceName }.checkIfLotteryExists`, { lottery_id: lotteryId });
+			return this.broker.call(`v1.${ serviceName }.checkIfLotteryExists`, { lotteryId });
 		},
 		fetchEndedLotteries() {
 			const timezoneOffsetMS = new Date().getTime() + -new Date().getTimezoneOffset() * 60 * 1000;

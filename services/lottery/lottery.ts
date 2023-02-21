@@ -121,6 +121,14 @@ const lotterySchema = new Schema<LotterySettings>(
 			required: false,
 			default: false,
 		},
+		tx_hash: {
+			type: String,
+			required: true
+		},
+		participants: {
+			type: [{ id: String, text: String }],
+			required: false
+		}
 	},
 	{
 		timestamps: true,

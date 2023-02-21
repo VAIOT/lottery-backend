@@ -196,6 +196,7 @@ const LotteryService: ServiceSchema = {
 					return undefined;
 				},
 			},
+			tx_hash: { type: "string" },
 			twitter: {
 				type: "object",
 				optional: false,

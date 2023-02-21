@@ -16,7 +16,10 @@ export default class<T extends ApiVersion> {
     protected async autoRetryOnRateLimitError<R>(callback: () => R | Promise<R>){
         while (true) {
             try {
-                return await callback();
+                const data = await callback();
+                if ((data as any).done) {
+                    return data;
+                }
             } catch (error) {
                 if (error instanceof ApiResponseError && error.rateLimitError && error.rateLimit) {
                     const resetTimeout = error.rateLimit.reset * 1000; // 15 mins

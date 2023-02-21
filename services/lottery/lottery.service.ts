@@ -330,13 +330,14 @@ const LotteryService: ServiceSchema = {
 							await this.broker.call(`v1.${ serviceName }.addParticipants`, { lotteryId, participants: participants.map(({text}) => text) }, { timeout: 0 });
 							await sleep(15000);
 							await this.broker.call(`v1.${ serviceName }.pickRandomNumber`, { lotteryId }, { timeout: 0 });
-							await this.broker.call(`v1.${ serviceName }.pickWinners`, { lotteryId }, { timeout: 0 });
+							await this.broker.call(`v1.${ serviceName }.payoutWinners`, { lotteryId }, { timeout: 0 });
 						}
 
 						// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
 						const winningWallets = await this.broker.call(`v1.${ serviceName }.getWinnersOfLottery`, { lotteryId }, { timeout: 0 }) as string[];
 					
-						this.addEndedLotteryPost(winningWallets, serviceName, endedLottery.lottery_id);
+						console.log("Winning wallets:", winningWallets)
+						// this.addEndedLotteryPost(winningWallets, serviceName, endedLottery.lottery_id);
 					}
 
 					// Set the lottery's active state to false

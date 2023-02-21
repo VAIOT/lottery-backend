@@ -320,7 +320,11 @@ const LotteryService: ServiceSchema = {
 							// call services to pick winner(s)
 							await this.broker.call(`v1.${ serviceName }.addParticipants`, { lotteryId, participants: wallets }, { timeout: 0 });
 							await sleep(15000);
-							await this.broker.call(`v1.${ serviceName }.pickRandomNumber`, { lotteryId }, { timeout: 0 });
+
+							const number = await this.broker.call(`v1.${ serviceName }.pickRandomNumber`, { lotteryId }, { timeout: 0 }) as { randomNumber: number | { status: null }};
+							if (typeof number === "object") {
+								continue;
+							}
 							await this.broker.call(`v1.${ serviceName }.payoutWinners`, { lotteryId }, { timeout: 0 });
 						}
 

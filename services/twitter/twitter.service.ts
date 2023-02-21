@@ -1,10 +1,8 @@
 /* eslint-disable no-continue */
-/* eslint-disable @typescript-eslint/naming-convention */
 import events from "events";
 import type { Context, ServiceSchema } from "moleculer";
 import mongoose from "mongoose";
 import Botometer from "./botometer";
-import type { Account, Post, PostContent } from "./interfaces/twitter";
 import Twitter from "./twitter.methods";
 
 events.defaultMaxListeners = 100;
@@ -14,6 +12,8 @@ mongoose.connect(`mongodb+srv://${process.env.MONGO_USER}:${process.env.MONGO_PA
 	throw new Error(error)
 });
 
+const twitter = new Twitter();
+
 const TwitterService: ServiceSchema = {
 	name: "twitter",
 	version: 1,
@@ -21,77 +21,89 @@ const TwitterService: ServiceSchema = {
 	settings: {},
 
 	actions: {
-		likes: {
+		likedBy: {
 			visibility: "protected",
 			rest: {
 				method: 'GET',
-				path: '/likes'
+				path: '/likedBy'
 			},
 			params: {
-				post_url: "string"
+				postUrl: "string"
 			},
-			handler(ctx: Context<Post>) {
-				const { post_url} = ctx.params;
-				return this.getLikedAndCommented(post_url);
+			handler(ctx: Context<{postUrl: string}>) {
+				const { postUrl } = ctx.params;
+				return twitter.getTweetLikes(postUrl);
 			}
 		},
-		retweets: {
+		retweetedBy: {
 			visibility: "protected",
 			rest: {
 				method: 'GET',
-				path: '/retweets'
+				path: '/retweetedBy'
 			},
 			params: {
-				post_url: "string"
+				postUrl: "string"
 			},
-			handler(ctx: Context<Post>) {
-				const { post_url } = ctx.params;
-				return this.getRetweets(post_url);
+			handler(ctx: Context<{postUrl: string}>) {
+				const { postUrl } = ctx.params;
+				return twitter.getTweetRetweets(postUrl);
 			}
 		},
-		followers: {
+		followedBy: {
 			visibility: "protected",
 			rest: {
 				method: 'GET',
-				path: '/followers'
+				path: '/followedBy'
 			},
 			params: {
 				user: "string"
 			},
-			handler(ctx: Context<Account>) {
+			handler(ctx: Context<{ user: string }>) {
 				const { user } = ctx.params;
-
-				return this.getFollowers(user);
+				return twitter.getUserFollowers(user);
 			}
 		},
-		content: {
+		tweetedBy: {
 			visibility: "protected",
 			rest: {
 				method: 'GET',
-				path: '/content'
+				path: '/tweetedBy'
 			},
 			params: {
 				content: "string",
-				date_from: "date"
+				dateFrom: "date"
 			},
-			handler(ctx: Context<PostContent>) {
-				const { content, date_from } = ctx.params;
-
-				return this.findTweetsWithContent(content, date_from);
+			handler(ctx: Context<{content: string, dateFrom: Date}>) {
+				const { content, dateFrom } = ctx.params;
+				return twitter.searchTweets(content, dateFrom);
 			}
 		},
-		participants: {
+		comments: {
 			visibility: "protected",
 			rest: {
 				method: 'GET',
 				path: '/participants'
 			},
 			params: {
-				wallet_post: "string",
+				postUrl: "string",
 			},
-			handler(ctx: Context<{ wallet_post: string }>) {
-				const { wallet_post } = ctx.params;
-				return this.getFilteredComments(wallet_post);
+			handler(ctx: Context<{ postUrl: string }>) {
+				const { postUrl } = ctx.params;
+				return twitter.getTweetComments(postUrl, true, true);
+			}
+		},
+		filterBots: {
+			visibility: "protected",
+			rest: {
+				method: 'POST',
+				path: '/filterBots'
+			},
+			params: {
+				users: "array",
+			},
+			handler(ctx: Context<{ users: string[] }>) {
+				const { users } = ctx.params;
+				return this.filterBots(users);
 			}
 		},
 		addPost: {
@@ -105,7 +117,7 @@ const TwitterService: ServiceSchema = {
 			},
 			async handler(ctx: Context<{ content: string }>) {
 				const { content } = ctx.params;
-				return new Twitter().addPost(content);
+				return new Twitter().addTweet(content);
 			}
 		}
 	},
@@ -120,99 +132,23 @@ const TwitterService: ServiceSchema = {
 	 */
 	methods: {
 		/**
-		 * Filter bots from comments and optionally compare commenting users from basePost and results array
+		 * Filter bots from users ids
 		 */
-		async getFilteredComments(basePostUrl: string): Promise<Partial<{ wallets: string[], errors: any, complete?: boolean}>> {
-			const twitterInstance = new Twitter();
+		async filterBots(usersIds: string[]) {
+			const botometer = new Botometer();
+			const realUsers: string[] = [];
 
-			// wallets
-			const tweetComments = await twitterInstance.getTweetComments(basePostUrl);
-			if (tweetComments.errors) {
-				return tweetComments;
-			}
-			const tweetWithAuthor = await twitterInstance.getTweetAuthor(basePostUrl);
-			if (tweetWithAuthor.errors) {
-				return tweetWithAuthor;
-			}
-			
-			// Remove tweet author
-			tweetComments.data = tweetComments.data.filter((wallet: any) => wallet.author_id !== tweetWithAuthor.data.author_id);
-
-			tweetComments.data = this.removeDuplicatedUserEntries(tweetComments.data);
-
-			const casualExtermination = await this.filterBots(tweetComments);
-
-			return casualExtermination;
-		},
-
-		removeDuplicatedUserEntries(entries: any[]) {
-			return entries.filter((entry, index, self) => self.findIndex(({author_id}) => entry.author_id === author_id) === index);
-		},
-
-		async filterBots(results: any) {
-			const realUsers: { data: any[], complete: boolean} = { data: [], complete: results.complete};
-			
-			for await (const result of results.data) {
-				const userId = result.author_id ?? result.id;
-
+			for await (const userId of usersIds) {
 				this.logger.debug(`Getting bot score for: ${userId}`);
+				const userScore = await botometer.getScoreFor(userId);
 
-				const botometer = await new Botometer().getScoreFor(userId);
-
-				if (botometer.cap?.universal > 0.94) {
+				if (userScore.cap?.universal > 0.94) {
 					this.logger.debug(`User removed from lottery: ${userId}`);
 					continue;
 				}
-
-				realUsers.data.push(result);
+				realUsers.push(userId);
 			}
 			return realUsers;
-		},
-
-		async getLikedAndCommented(postUrl: string) {
-			const twitterInstance = new Twitter();
-
-			const comments = await twitterInstance.getTweetComments(postUrl);
-			if (comments.errors) {
-				return comments;
-			}
-			
-			const likes = await twitterInstance.getTweetLikes(postUrl);
-			if (likes.errors) {
-				return likes;
-			}
-			
-			comments.data = comments.data
-			.filter((comment: any) => likes.data.some((like: any) => like.id === comment.author_id));
-
-			return comments;
-		},
-
-		async getRetweets(postUrl: string) {
-			const twitterInstance = new Twitter();
-
-			const tweetWithAuthor = await twitterInstance.getTweetAuthor(postUrl);
-			
-			if (tweetWithAuthor.errors) {
-				return tweetWithAuthor;
-			}
-			const retweets = await twitterInstance.getRetweets(postUrl);
-
-			if (retweets.errors) {
-				return retweets;
-			}
-
-			const data = retweets.data.filter((retweet: any) => retweet.id !== tweetWithAuthor.data.author_id);
-
-			return { data, complete: retweets.complete };
-		},
-
-		async findTweetsWithContent(content: string, dateFrom: Date) {
-			return new Twitter().findTweetsWithContent(content, dateFrom);
-		},
-
-		async getFollowers(user: string) {
-			return new Twitter().getFollowers(user);
 		}
 	},
 

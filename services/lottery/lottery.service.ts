@@ -198,6 +198,7 @@ const LotteryService: ServiceSchema = {
 					return undefined;
 				},
 			},
+			tx_hash: { type: "string" },
 			twitter: {
 				type: "object",
 				optional: false,
@@ -406,6 +407,8 @@ const LotteryService: ServiceSchema = {
 				// Keep users who posted wallet
 				this.logger.debug('Fetching wallets from comments.');
 				baseParticipants = baseParticipants.flatMap(({text, author_id}) => ({ author_id, text: text.match(regex.wallet)?.[0] ?? ''}));
+
+				// TODO filter bots
 			}
 			return baseParticipants;
 		},

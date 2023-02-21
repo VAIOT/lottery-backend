@@ -1,16 +1,10 @@
 /* eslint-disable no-continue */
 import events from "events";
 import type { Context, ServiceSchema } from "moleculer";
-import mongoose from "mongoose";
 import Botometer from "./botometer";
 import Twitter from "./methods";
 
 events.defaultMaxListeners = 100;
-
-mongoose.connect(`mongodb+srv://${process.env.MONGO_USER}:${process.env.MONGO_PASS}@${process.env.MONGO_URI}`)
-.catch((error) => {
-	throw new Error(error)
-});
 
 const twitter = new Twitter();
 

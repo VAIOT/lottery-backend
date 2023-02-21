@@ -26,7 +26,11 @@ const TwitterService: ServiceSchema = {
 			},
 			handler(ctx: Context<{postUrl: string}>) {
 				const { postUrl } = ctx.params;
-				return twitter.getTweetLikes(postUrl);
+				try {
+					return twitter.getTweetLikes(postUrl);
+				} catch(e) {
+					return [];
+				}
 			}
 		},
 		retweetedBy: {
@@ -40,7 +44,11 @@ const TwitterService: ServiceSchema = {
 			},
 			handler(ctx: Context<{postUrl: string}>) {
 				const { postUrl } = ctx.params;
-				return twitter.getTweetRetweets(postUrl);
+				try {
+					return twitter.getTweetRetweets(postUrl);
+				} catch(e) {
+					return [];
+				}
 			}
 		},
 		followedBy: {
@@ -54,7 +62,11 @@ const TwitterService: ServiceSchema = {
 			},
 			handler(ctx: Context<{ userName: string }>) {
 				const { userName } = ctx.params;
-				return twitter.getUserFollowers(userName);
+				try {
+					return twitter.getUserFollowers(userName);
+				} catch(e) {
+					return [];
+				}
 			}
 		},
 		tweetedBy: {
@@ -69,7 +81,11 @@ const TwitterService: ServiceSchema = {
 			},
 			handler(ctx: Context<{content: string, dateFrom: Date}>) {
 				const { content, dateFrom } = ctx.params;
-				return twitter.searchTweets(content, dateFrom);
+				try {
+					return twitter.searchTweets(content, dateFrom);
+				} catch(e) {
+					return [];
+				}
 			}
 		},
 		comments: {
@@ -83,7 +99,11 @@ const TwitterService: ServiceSchema = {
 			},
 			handler(ctx: Context<{ postUrl: string }>) {
 				const { postUrl } = ctx.params;
-				return twitter.getTweetComments(postUrl, true, true);
+				try {
+					return twitter.getTweetComments(postUrl, true, true);
+				} catch(e) {
+					return null;
+				}
 			}
 		},
 		filterBots: {

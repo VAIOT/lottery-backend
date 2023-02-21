@@ -304,6 +304,10 @@ const LotteryService: ServiceSchema = {
 						// Get all participants
 						participants = await this.getParticipants(endedLottery);
 
+						if (!participants) {
+							continue;
+						}
+
 						// Save to db
 						await this.actions.update({ id: endedLottery._id, participants });
 
@@ -314,7 +318,7 @@ const LotteryService: ServiceSchema = {
 
 						const serviceName = (endedLottery.asset_choice === TOKEN_TYPE.MATIC ? 'matic' : 'erc').toLowerCase();
 
-						const lotteryExists = await this.checkIfLotteryExists(serviceName, endedLotteries.lottery_id);
+						const lotteryExists = await this.checkIfLotteryExists(serviceName, endedLottery.lottery_id);
 						const lotteryId = endedLottery.lottery_id;
 
 						if (!lotteryExists) {
@@ -367,37 +371,39 @@ const LotteryService: ServiceSchema = {
 			const twitterRequirements = Object.entries(reqs);
 
 			let baseParticipants = await this.broker.call("v1.twitter.comments", { postUrl: wallet_post }, { timeout: 0 }) as { text: string; author_id: string; }[];
-		
-			for await (const [key, value] of twitterRequirements) {
-				this.logger.debug(`Getting participants, key: ${key} value: ${value}.`);
 
-				let participants: string[] = [];
-				switch (key) {
-					case "like":
-						participants = await this.broker.call("v1.twitter.likedBy", { postUrl: value }, { timeout: 0 }) as string[];
-						break;
-					case "content":
-						participants = await this.broker.call("v1.twitter.tweetedBy", { content: value, dateFrom: createdAt }, { timeout: 0 })  as string[];
-						break;
-					case "retweet":
-						participants = await this.broker.call("v1.twitter.retweetedBy", { postUrl: value }, { timeout: 0 }) as string[];
-						break;
-					case "follow":
-						participants = await this.broker.call("v1.twitter.followedBy", { userName: value }, { timeout: 0 }) as string[];
-						break;
-					default:
-						this.logger.error(`Unknown key ${key}`);
+			if (baseParticipants) {
+				for await (const [key, value] of twitterRequirements) {
+					this.logger.debug(`Getting participants, key: ${key} value: ${value}.`);
+
+					let participants: string[] = [];
+					switch (key) {
+						case "like":
+							participants = await this.broker.call("v1.twitter.likedBy", { postUrl: value }, { timeout: 0 }) as string[];
+							break;
+						case "content":
+							participants = await this.broker.call("v1.twitter.tweetedBy", { content: value, dateFrom: createdAt }, { timeout: 0 })  as string[];
+							break;
+						case "retweet":
+							participants = await this.broker.call("v1.twitter.retweetedBy", { postUrl: value }, { timeout: 0 }) as string[];
+							break;
+						case "follow":
+							participants = await this.broker.call("v1.twitter.followedBy", { userName: value }, { timeout: 0 }) as string[];
+							break;
+						default:
+							this.logger.error(`Unknown key ${key}`);
+					}
+
+					// Keep users who meet requirements
+					baseParticipants = baseParticipants.filter((comment: any) =>
+						participants.some((id) => comment.author_id === id)
+					);
 				}
 
-				// Keep users who meet requirements
-				baseParticipants = baseParticipants.filter((comment: any) =>
-					participants.some((id) => comment.author_id === id)
-				);
+				// Keep users who posted wallet
+				this.logger.debug('Fetching wallets from comments.');
+				baseParticipants = baseParticipants.filter(({text}) => text.match(regex.wallet)?.[0]);
 			}
-
-			// Keep users who posted wallet
-			this.logger.debug('Fetching wallets from comments.');
-			baseParticipants = baseParticipants.filter(({text}) => text.match(regex.wallet)?.[0]);
 
 			return baseParticipants;
 		},

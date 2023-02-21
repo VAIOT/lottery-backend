@@ -47,10 +47,6 @@ const lotterySchema = new Schema<LotterySettings>(
 			type: String,
 			required: true,
 		},
-		wallets: {
-			type: [String],
-			required: false
-		},
 		final_rewards: {
 			type: [String],
 			required: false,
@@ -120,6 +116,10 @@ const lotterySchema = new Schema<LotterySettings>(
 			required: false,
 			default: false,
 		},
+		participants: {
+			type: [{ id: String, wallet: String }],
+			required: false
+		}
 	},
 	{
 		timestamps: true,

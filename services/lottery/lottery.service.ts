@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 /* eslint-disable no-continue */
 /* eslint-disable @typescript-eslint/naming-convention */
 /* eslint-disable @typescript-eslint/no-implied-eval */
@@ -38,7 +39,7 @@ const LotteryService: ServiceSchema = {
 			"number_of_tokens",
 			"distribution_options",
 			"fees_amount",
-			"wallets",
+			"participants",
 			"num_of_winners",
 			"asset_choice",
 			"twitter",
@@ -287,7 +288,6 @@ const LotteryService: ServiceSchema = {
 		},
 
 		async findAndStartEndedLotteries() {
-
 			this.logger.debug(`Looking for ended lotteries...`);
 			const endedLotteries = await this.fetchEndedLotteries();
 
@@ -296,22 +296,18 @@ const LotteryService: ServiceSchema = {
 
 				for await (const endedLottery of endedLotteries as LotteryEntity[]) {
 
-					let { wallets } = (await this.actions.find({ query: { _id: endedLottery._id } }))[0];
+					let { participants } = (await this.actions.find({ query: { _id: endedLottery._id } }))[0] as { participants: {id: string, wallet: string }[]};
 
-					if (wallets.length > 0) {
-						this.logger.debug(`Found ${wallets.length} wallets in db.`);
+					if (participants?.length > 0) {
+						this.logger.debug(`Found ${participants.length} participants in db.`);
 					} else {
-						// Get wallets of all participants
-						wallets = await this.getParticipants(endedLottery);
+						// Get all participants
+						participants = await this.getParticipants(endedLottery);
 
-						if (!wallets) {
-							continue;
-						}
+						// Save to db
+						await this.actions.update({ id: endedLottery._id, participants });
 
-						// Save wallets to db in case of failure
-						await this.actions.update({ id: endedLottery._id, wallets });
-
-						this.logger.debug(`Saved ${wallets.length} wallets to db.`);
+						this.logger.debug(`Saved ${participants.length} participants to db.`);
 					}
 					
 					if (process.env.NODE_ENV === "production") {
@@ -326,10 +322,9 @@ const LotteryService: ServiceSchema = {
 							continue;
 						}
 						
-						if (wallets.length > 0) {
-
+						if (participants.length > 0) {
 							// call services to pick winner(s)
-							await this.broker.call(`v1.${ serviceName }.addParticipants`, { lotteryId, participants: wallets }, { timeout: 0 });
+							await this.broker.call(`v1.${ serviceName }.addParticipants`, { lotteryId, participants: participants.flatMap(({wallet}) => wallet) }, { timeout: 0 });
 							await sleep(15000);
 							await this.broker.call(`v1.${ serviceName }.pickRandomNumber`, { lotteryId }, { timeout: 0 });
 							await this.broker.call(`v1.${ serviceName }.pickWinners`, { lotteryId }, { timeout: 0 });
@@ -360,7 +355,7 @@ const LotteryService: ServiceSchema = {
 			: `Lottery #${lotteryId} asset: ${lotteryAsset} ended with no winners; No participants.`;
 
 			// Post lottery results to Twitter
-			const postId = await this.broker.call("v1.twitter.addPost", { content: postText }, { timeout: 0 });
+			const postId = await this.broker.call("v1.twitter.addTweet", { content: postText }, { timeout: 0 });
 									
 			// Log the post ID
 			this.logger.debug(`Post added! Id: ${postId}.`);
@@ -371,60 +366,41 @@ const LotteryService: ServiceSchema = {
 			const { wallet_post, ...reqs } = twitter;
 			const twitterRequirements = Object.entries(reqs);
 
-
-			const baseParticipants = await this.broker.call("v1.twitter.participants", { wallet_post }, { timeout: 0 }) as any;
-
-			if (baseParticipants.errors || !baseParticipants.complete) {
-				this.logger.error(baseParticipants.errors ?? 'Fetching not completed');
-
-				return null;
-			}
+			let baseParticipants = await this.broker.call("v1.twitter.comments", { postUrl: wallet_post }, { timeout: 0 }) as { text: string; author_id: string; }[];
 		
 			for await (const [key, value] of twitterRequirements) {
 				this.logger.debug(`Getting participants, key: ${key} value: ${value}.`);
 
-				let participants: { data?: any[], errors?: unknown, complete?: boolean } = {};
+				let participants: string[] = [];
 				switch (key) {
 					case "like":
-						participants = await this.broker.call("v1.twitter.likes", { wallet_post, post_url: value }, { timeout: 0 });
+						participants = await this.broker.call("v1.twitter.likedBy", { postUrl: value }, { timeout: 0 }) as string[];
 						break;
 					case "content":
-						participants = await this.broker.call("v1.twitter.content", { wallet_post, content: value, date_from: createdAt }, { timeout: 0 });
+						participants = await this.broker.call("v1.twitter.tweetedBy", { content: value, dateFrom: createdAt }, { timeout: 0 })  as string[];
 						break;
 					case "retweet":
-						participants = await this.broker.call("v1.twitter.retweets", { wallet_post, post_url: value }, { timeout: 0 });
+						participants = await this.broker.call("v1.twitter.retweetedBy", { postUrl: value }, { timeout: 0 }) as string[];
 						break;
 					case "follow":
-						participants = await this.broker.call("v1.twitter.followers", { wallet_post, user: value }, { timeout: 0 });
+						participants = await this.broker.call("v1.twitter.followedBy", { userName: value }, { timeout: 0 }) as string[];
 						break;
 					default:
 						this.logger.error(`Unknown key ${key}`);
 				}
 
-				if (participants.errors || !participants.complete) {
-					this.logger.error(participants.errors ?? 'Fetching not completed');
-
-					return null;
-				}
-
-				// Keep users who participated in twitter activity
-				baseParticipants.data = baseParticipants.data.filter((comment: any, index: any, self: any) =>
-					participants.data!.some((participant: any) => comment.author_id === (participant.author_id ?? participant.id))
+				// Keep users who meet requirements
+				baseParticipants = baseParticipants.filter((comment: any) =>
+					participants.some((id) => comment.author_id === id)
 				);
 			}
-			return this.getWallets(baseParticipants);
-		},
 
-		/**
-		* A function to get array of wallets from participants or return null if errors occured
-		*/
-		getWallets(participants: any): string[] | null {
+			// Keep users who posted wallet
 			this.logger.debug('Fetching wallets from comments.');
+			baseParticipants = baseParticipants.filter(({text}) => text.match(regex.wallet)?.[0]);
 
-			// Get wallets from content and remove duplicated wallets
-			return Array.from(new Set(participants.data
-				.flatMap(({text}: any) => text.match(regex.wallet)?.[0])));
-		}
+			return baseParticipants;
+		},
 	},
 
 	/**

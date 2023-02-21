@@ -3,7 +3,7 @@ import events from "events";
 import type { Context, ServiceSchema } from "moleculer";
 import mongoose from "mongoose";
 import Botometer from "./botometer";
-import Twitter from "./twitter.methods";
+import Twitter from "./methods";
 
 events.defaultMaxListeners = 100;
 
@@ -56,11 +56,11 @@ const TwitterService: ServiceSchema = {
 				path: '/followedBy'
 			},
 			params: {
-				user: "string"
+				userName: "string"
 			},
-			handler(ctx: Context<{ user: string }>) {
-				const { user } = ctx.params;
-				return twitter.getUserFollowers(user);
+			handler(ctx: Context<{ userName: string }>) {
+				const { userName } = ctx.params;
+				return twitter.getUserFollowers(userName);
 			}
 		},
 		tweetedBy: {
@@ -106,11 +106,11 @@ const TwitterService: ServiceSchema = {
 				return this.filterBots(users);
 			}
 		},
-		addPost: {
+		addTweet: {
 			visibility: "protected",
 			rest: {
 				method: 'POST',
-				path: '/addPost'
+				path: '/addTweet'
 			},
 			params: {
 				content: "string"

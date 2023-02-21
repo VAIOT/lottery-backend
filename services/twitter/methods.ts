@@ -54,7 +54,7 @@ export default class Twitter {
     async getUserFollowers(userName: string): Promise<string[]> { // v1
         const followers = await this.ApiV1.getFollowers(await this.getUserId(userName));
 
-        return followers.ids
+        return followers?.ids
     }
 
     async searchTweets(content: string, dateFrom: Date): Promise<string[]> { // v2

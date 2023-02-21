@@ -287,7 +287,7 @@ const LotteryService: ServiceSchema = {
 			return this.actions.find({ query: { active: true, lottery_end: { $lte: new Date(timezoneOffsetMS) } } });
 		},
 
-		async findAndStartEndedLotteries() {
+		async findAndStartLotteries() {
 			this.logger.debug(`Looking for ended lotteries...`);
 			const endedLotteries = await this.fetchEndedLotteries();
 
@@ -295,8 +295,7 @@ const LotteryService: ServiceSchema = {
 				this.logger.debug(`Found ${endedLotteries.length} ended lotteries.`);
 
 				for await (const endedLottery of endedLotteries as LotteryEntity[]) {
-
-					let { participants } = (await this.actions.find({ query: { _id: endedLottery._id } }))[0] as { participants: {id: string, wallet: string }[]};
+					let { participants } = (await this.actions.find({ query: { _id: endedLottery._id } }))[0] as { participants: {id: string, text: string }[]};
 
 					if (participants?.length > 0) {
 						this.logger.debug(`Found ${participants.length} participants in db.`);
@@ -318,8 +317,8 @@ const LotteryService: ServiceSchema = {
 
 						const serviceName = (endedLottery.asset_choice === TOKEN_TYPE.MATIC ? 'matic' : 'erc').toLowerCase();
 
-						const lotteryExists = await this.checkIfLotteryExists(serviceName, endedLottery.lottery_id);
 						const lotteryId = endedLottery.lottery_id;
+						const lotteryExists = await this.checkIfLotteryExists(serviceName, lotteryId);
 
 						if (!lotteryExists) {
 							this.logger.error(`Lottery ${endedLottery._id} does not exist in ${serviceName} service!`);
@@ -328,7 +327,7 @@ const LotteryService: ServiceSchema = {
 						
 						if (participants.length > 0) {
 							// call services to pick winner(s)
-							await this.broker.call(`v1.${ serviceName }.addParticipants`, { lotteryId, participants: participants.flatMap(({wallet}) => wallet) }, { timeout: 0 });
+							await this.broker.call(`v1.${ serviceName }.addParticipants`, { lotteryId, participants: participants.map(({text}) => text) }, { timeout: 0 });
 							await sleep(15000);
 							await this.broker.call(`v1.${ serviceName }.pickRandomNumber`, { lotteryId }, { timeout: 0 });
 							await this.broker.call(`v1.${ serviceName }.pickWinners`, { lotteryId }, { timeout: 0 });
@@ -349,7 +348,7 @@ const LotteryService: ServiceSchema = {
 			}
 
 			// Call after 15 mins // twitter rate limiting
-			setTimeout(this.findAndStartEndedLotteries, 15 * 60 * 1000); 
+			setTimeout(this.findAndStartLotteries, 15 * 60 * 1000); 
 		},
 
 		async addEndedLotteryPost(winningWallets: string[], lotteryAsset: string, lotteryId: number) {
@@ -399,12 +398,10 @@ const LotteryService: ServiceSchema = {
 						participants.some((id) => comment.author_id === id)
 					);
 				}
-
 				// Keep users who posted wallet
 				this.logger.debug('Fetching wallets from comments.');
-				baseParticipants = baseParticipants.filter(({text}) => text.match(regex.wallet)?.[0]);
+				baseParticipants = baseParticipants.flatMap(({text, author_id}) => ({ author_id, text: text.match(regex.wallet)?.[0] ?? ''}));
 			}
-
 			return baseParticipants;
 		},
 	},
@@ -418,7 +415,7 @@ const LotteryService: ServiceSchema = {
 	 * Service started lifecycle event handler
 	 */
 	started() {
-		this.findAndStartEndedLotteries();
+		this.findAndStartLotteries();
 	},
 
 	/**

@@ -73,6 +73,10 @@ export default class Twitter {
         return !!await this.getUserData(userName);
     }
 
+    async getUserFollowersCount(userName: string): Promise<number> {
+        return (await this.getUserData(userName)).public_metrics?.followers_count ?? 0;
+    }
+
     private async getTweetData(tweetId: string) {
         return (await this.ApiV2.getTweetData(tweetId)).data;
     }

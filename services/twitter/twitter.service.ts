@@ -105,20 +105,6 @@ const TwitterService: ServiceSchema = {
 				const { users } = ctx.params;
 				return this.filterBots(users);
 			}
-		},
-		addPost: {
-			visibility: "protected",
-			rest: {
-				method: 'POST',
-				path: '/addPost'
-			},
-			params: {
-				content: "string"
-			},
-			async handler(ctx: Context<{ content: string }>) {
-				const { content } = ctx.params;
-				return new Twitter().addTweet(content);
-			}
 		}
 	},
 

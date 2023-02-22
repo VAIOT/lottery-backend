@@ -52,7 +52,7 @@ export default class Twitter {
     }
 
     async getUserFollowers(userName: string): Promise<string[]> { // v1
-        const followers = await this.ApiV1.getFollowers(await this.getUserId(userName));
+        const followers = await this.ApiV1.getFollowers((await this.getUserData(userName)).id);
 
         return followers.ids;
     }
@@ -65,12 +65,20 @@ export default class Twitter {
         : []
     }
 
+    async checkIfTweetExists(tweetUrl: string): Promise<boolean> {
+        return !!await this.getTweetData(this.getPostId(tweetUrl));
+    }
+
+    async checkIfUserExists(userName: string): Promise<boolean> {
+        return !!await this.getUserData(userName);
+    }
+
     private async getTweetData(tweetId: string) {
         return (await this.ApiV2.getTweetData(tweetId)).data;
     }
 
-    private async getUserId(userName: string): Promise<string> {
-        return (await this.ApiV2.getUserData(userName)).data.id;
+    private async getUserData(userName: string) {
+        return (await this.ApiV2.getUserData(userName)).data;
     }
 
     private getPostId(url: string) {

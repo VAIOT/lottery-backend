@@ -119,6 +119,34 @@ const TwitterService: ServiceSchema = {
 				const { users } = ctx.params;
 				return this.filterBots(users);
 			}
+		},
+		checkIfTweetExists: {
+			visibility: "protected",
+			rest: {
+				method: 'GET',
+				path: '/checkIfTweetExists'
+			},
+			params: {
+				postUrl: "string"
+			},
+			handler(ctx: Context<{ postUrl: string }>) {
+				const { postUrl } = ctx.params;
+				return twitter.checkIfTweetExists(postUrl);
+			}
+		},
+		checkIfUserExists: {
+			visibility: "protected",
+			rest: {
+				method: 'GET',
+				path: '/checkIfUserExists'
+			},
+			params: {
+				userName: "string"
+			},
+			handler(ctx: Context<{ userName: string }>) {
+				const { userName } = ctx.params;
+				return twitter.checkIfUserExists(userName);
+			}
 		}
 	},
 

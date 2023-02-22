@@ -406,9 +406,12 @@ const LotteryService: ServiceSchema = {
 				}
 				// Keep users who posted wallet
 				this.logger.debug('Fetching wallets from comments.');
-				baseParticipants = baseParticipants.flatMap(({text, author_id}) => ({ author_id, text: text.match(regex.wallet)?.[0] ?? ''}));
+				baseParticipants = baseParticipants.map(({text, author_id}) => ({ author_id, text: text.match(regex.wallet)?.[0] ?? ''}));
 
-				// TODO filter bots
+				// Filter bots
+				const filteredIds = await this.broker.call("v1.twitter.filterBots", { users: baseParticipants.map(({author_id}) => author_id) }, { timeout: 0 }) as string[];
+				
+				baseParticipants = baseParticipants.filter(({author_id}) => filteredIds.includes(author_id));
 			}
 			return baseParticipants;
 		},

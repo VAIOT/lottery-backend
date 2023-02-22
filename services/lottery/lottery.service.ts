@@ -343,7 +343,8 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 							if (typeof pickRandomNumberResponse.randomNumber === "object") {
 								continue;
 							}
-							await this.broker.call(`v1.${ serviceName }.payoutWinners`, { lotteryId }, { timeout: 0 });
+							
+							await this.broker.call(`v1.${ serviceName }.payoutWinners`, { lotteryId, _id: endedLottery._id }, { timeout: 0 });
 						} else {
 							// TODO emergency payout
 						}

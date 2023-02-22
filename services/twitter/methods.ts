@@ -54,7 +54,7 @@ export default class Twitter {
     async getUserFollowers(userName: string): Promise<string[]> { // v1
         const followers = await this.ApiV1.getFollowers(await this.getUserId(userName));
 
-        return followers?.ids
+        return followers.ids;
     }
 
     async searchTweets(content: string, dateFrom: Date): Promise<string[]> { // v2
@@ -63,10 +63,6 @@ export default class Twitter {
         return search.data.data
         ? search.data.data.flatMap(({author_id}) => author_id ?? '')
         : []
-    }
-
-    async addTweet(content: string): Promise<string> { // v2
-        return this.ApiV2.addTweet(content);
     }
 
     private async getTweetData(tweetId: string) {

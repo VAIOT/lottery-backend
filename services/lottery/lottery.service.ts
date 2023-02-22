@@ -236,7 +236,7 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 	 */
 	hooks: {
 		after: {
-			async create(this: LotteryThis, ctx: Context<LotteryEntity>, savedLottery: LotteryEntity) {
+			async create(ctx: Context<LotteryEntity>, savedLottery: LotteryEntity) {
 				const { 
 					distribution_method, 
 					wallet, num_of_winners,
@@ -248,7 +248,7 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 				
 				// TODO fix this later
 				
-				this.logger.debug(`Lottery #${savedLottery._id} saved in db.`);
+				(this.logger as any).debug(`Lottery #${savedLottery._id} saved in db.`);
 
 				const data = {
 					lotteryType: distribution_method, // SPLIT OR PERCENTAGE
@@ -261,12 +261,12 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 				};
 
 				if (process.env.NODE_ENV === "production") {
-					this.logger.debug(`Lottery #${savedLottery._id} opening...`);
+					(this.logger as any).debug(`Lottery #${savedLottery._id} opening...`);
 					// Call service
 					const serviceName = (asset_choice === TOKEN_TYPE.MATIC ? 'matic' : 'erc').toLowerCase();
 					await ctx.call(`v1.${ serviceName }.openLottery`, data);
 
-					this.logger.debug(`Lottery #${savedLottery._id} opened.`);
+					(this.logger as any).debug(`Lottery #${savedLottery._id} opened.`);
 				}
 				
 				// Activate lottery 
@@ -353,7 +353,7 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 							if (typeof pickRandomNumberResponse.randomNumber === "object") {
 								continue;
 							}
-							
+
 							await this.broker.call(`v1.${ serviceName }.payoutWinners`, { lotteryId, _id: endedLottery._id }, { timeout: 0 });
 						} else {
 							// TODO emergency payout

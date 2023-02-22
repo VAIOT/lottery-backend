@@ -327,10 +327,10 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 
 							// call services to pick winner(s)
 							this.logger.info('Before addParticipants');
-							const addParticipantsResponse = await this.broker.call(`v1.${ serviceName }.addParticipants`, { lotteryId, participants: participants.map(({text}) => text) }, { timeout: 0 });
+							const addParticipantsResponse = await this.broker.call(`v1.${ serviceName }.addParticipants`, { lotteryId, participants: participants.map(({text}) => text) }, { timeout: 0 }) as { status: string };
 							this.logger.info('After addParticipants');
-							
-							if (typeof addParticipantsResponse === "object") {
+
+							if (addParticipantsResponse.status !== "OK") {
 								this.deactivateLottery(endedLottery._id);
 								continue;
 							}
@@ -344,6 +344,8 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 								continue;
 							}
 							await this.broker.call(`v1.${ serviceName }.payoutWinners`, { lotteryId }, { timeout: 0 });
+						} else {
+							// TODO emergency payout
 						}
 
 						// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion

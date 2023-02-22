@@ -117,7 +117,7 @@ const lotterySchema = new Schema<LotterySettings>(
 			default: false,
 		},
 		tx_hash: {
-			type: String,
+			type: [String],
 			required: true
 		},
 		participants: {

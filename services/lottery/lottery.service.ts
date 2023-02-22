@@ -198,7 +198,7 @@ const LotteryService: ServiceSchema = {
 					return undefined;
 				},
 			},
-			tx_hash: { type: "string" },
+			tx_hash: { type: "array" },
 			twitter: {
 				type: "object",
 				optional: false,
@@ -298,6 +298,8 @@ const LotteryService: ServiceSchema = {
 				for await (const endedLottery of endedLotteries as LotteryEntity[]) {
 					let { participants } = (await this.actions.find({ query: { _id: endedLottery._id } }))[0] as { participants: {id: string, text: string }[]};
 
+					console.log(participants.map(({text}) => text))
+
 					if (participants?.length > 0) {
 						this.logger.debug(`Found ${participants.length} participants in db.`);
 					} else {
@@ -342,7 +344,7 @@ const LotteryService: ServiceSchema = {
 						const winningWallets = await this.broker.call(`v1.${ serviceName }.getWinnersOfLottery`, { lotteryId }, { timeout: 0 }) as string[];
 					
 						console.log("Winning wallets:", winningWallets)
-						// this.addEndedLotteryPost(winningWallets, serviceName, endedLottery.lottery_id);
+						// TODO addEndedLotteryPost()
 					}
 
 					// Set the lottery's active state to false
@@ -357,17 +359,17 @@ const LotteryService: ServiceSchema = {
 			setTimeout(this.findAndStartLotteries, 15 * 60 * 1000); 
 		},
 
-		async addEndedLotteryPost(winningWallets: string[], lotteryAsset: string, lotteryId: number) {
+		addEndedLotteryPost(winningWallets: string[], lotteryAsset: string, lotteryId: number) {
 			
 			const postText = winningWallets.length > 0
 			? `Winning wallets in lottery #${lotteryId} asset: ${lotteryAsset} are: ${winningWallets.join(', ')}`
 			: `Lottery #${lotteryId} asset: ${lotteryAsset} ended with no winners; No participants.`;
 
-			// Post lottery results to Twitter
-			const postId = await this.broker.call("v1.twitter.addTweet", { content: postText }, { timeout: 0 });
-									
+			// Post lottery results to Telegram
+			// TODO Telegram call
+
 			// Log the post ID
-			this.logger.debug(`Post added! Id: ${postId}.`);
+			this.logger.debug(`Post added! Id: ${1}.`);
 		},
 
 		async getParticipants(endedLottery: LotteryEntity) {

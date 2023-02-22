@@ -12,7 +12,7 @@ interface ILotteryBase {
 	asset_choice: TOKEN_TYPE;
 	final_rewards?: string[];
 	participants?: { id: string, text: string }[];
-	tx_hash: string;
+	tx_hash: string[];
 }
 
 export interface IERC20 extends ILotteryBase {

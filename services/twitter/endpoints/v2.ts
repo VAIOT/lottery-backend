@@ -70,6 +70,6 @@ export default class extends BaseApi<'v2'> {
     }
 
     async getUserData(userName: string): Promise<UserV2Result> {
-		return this.autoRetryOnRateLimitError(() => this.api.userByUsername(userName.substring(1, userName.length)));
+		return this.autoRetryOnRateLimitError(() => this.api.userByUsername(userName.substring(1, userName.length), { "user.fields": ["public_metrics"]}));
 	}
 }

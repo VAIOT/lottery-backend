@@ -236,7 +236,7 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 	 */
 	hooks: {
 		after: {
-			async create(ctx: Context<LotteryEntity>, savedLottery: LotteryEntity) {
+			async create(this: LotteryThis, ctx: Context<LotteryEntity>, savedLottery: LotteryEntity) {
 				const { 
 					distribution_method, 
 					wallet, num_of_winners,
@@ -247,9 +247,8 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 					tx_hash } = ctx.params;
 				
 				// TODO fix this later
-				const logger = (this.logger as unknown as LoggerInstance);
 				
-				logger.debug(`Lottery #${savedLottery._id} saved in db.`);
+				this.logger.debug(`Lottery #${savedLottery._id} saved in db.`);
 
 				const data = {
 					lotteryType: distribution_method, // SPLIT OR PERCENTAGE
@@ -262,12 +261,12 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 				};
 
 				if (process.env.NODE_ENV === "production") {
-					logger.debug(`Lottery #${savedLottery._id} opening...`);
+					this.logger.debug(`Lottery #${savedLottery._id} opening...`);
 					// Call service
 					const serviceName = (asset_choice === TOKEN_TYPE.MATIC ? 'matic' : 'erc').toLowerCase();
 					await ctx.call(`v1.${ serviceName }.openLottery`, data);
 
-					logger.debug(`Lottery #${savedLottery._id} opened.`);
+					this.logger.debug(`Lottery #${savedLottery._id} opened.`);
 				}
 				
 				// Activate lottery 
@@ -301,7 +300,7 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 			this.logger.debug(`Looking for ended lotteries...`);
 			const endedLotteries = await this.fetchEndedLotteries();
 
-			if (endedLotteries.length > 0) {
+			if (endedLotteries.length) {
 				this.logger.debug(`Found ${endedLotteries.length} ended lotteries.`);
 
 				for await (const endedLottery of endedLotteries as LotteryEntity[]) {
@@ -337,14 +336,20 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 						
 						if (participants.length > 0) {
 							// call services to pick winner(s)
+							this.logger.info('Before addParticipants');
 							const addParticipantsResponse = await this.broker.call(`v1.${ serviceName }.addParticipants`, { lotteryId, participants: participants.map(({text}) => text) }, { timeout: 0 });
+							this.logger.info('After addParticipants');
+							
 							if (typeof addParticipantsResponse === "object") {
 								this.deactivateLottery(endedLottery._id);
 								continue;
 							}
 							await sleep(15000);
 
+							this.logger.info('Before pickRandomNumber');
 							const pickRandomNumberResponse = await this.broker.call(`v1.${ serviceName }.pickRandomNumber`, { lotteryId }, { timeout: 0 }) as { randomNumber: number | { status: null }};
+							this.logger.info('After pickRandomNumber');
+
 							if (typeof pickRandomNumberResponse.randomNumber === "object") {
 								continue;
 							}

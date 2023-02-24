@@ -225,7 +225,10 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 		},
 	},
 
-	dependencies: [{ name: "twitter", version: 1 }],
+	dependencies: [
+		{ name: "tx", version: 1 }, 
+		{ name: "twitter", version: 1 }
+	],
 
 	actions: {},
 
@@ -284,7 +287,7 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 						await sleep(5000);
 
 						result = !timedOut
-						? (await this.broker.call(`v1.tx.getTxStatus`, { tokenType, txHash: hash }) as { result: string }).result
+						? ((await this.broker.call(`v1.tx.getTxStatus`, { tokenType, txHash: hash })) as any).result
 						: "STUCK"
 					}
 					return result === "SUCCESS";

@@ -221,7 +221,6 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 					wallet_post: { type: "string", pattern: regex.twitter.post, optional: false },
 				},
 			},
-			$$strict: "remove",
 		},
 	},
 
@@ -234,7 +233,7 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 	 */
 	hooks: {
 		before: {
-			create(ctx: Context<Partial<LotteryDTO>>) {
+			create(ctx: Context<LotteryDTO>) {
 				const { tx_hashes } = ctx.params;
 
 				// Map the array of strings tx_hashes to array of objects

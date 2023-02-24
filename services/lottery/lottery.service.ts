@@ -46,6 +46,7 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 			"distribution_options",
 			"fees_amount",
 			"participants",
+			"wallet",
 			"num_of_winners",
 			"asset_choice",
 			"transactions",

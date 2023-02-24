@@ -1,5 +1,10 @@
 import type { ERC20_TYPE, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from "../enums";
 
+type TxHash = {
+	value: string,
+	status: string
+}
+
 interface ILotteryBase {
 	lottery_id: number;
 	duration: number;
@@ -12,7 +17,7 @@ interface ILotteryBase {
 	asset_choice: TOKEN_TYPE;
 	final_rewards?: string[];
 	participants?: { id: string, text: string }[];
-	tx_hash: string[];
+	tx_hash: TxHash[];
 }
 
 export interface IERC20 extends ILotteryBase {

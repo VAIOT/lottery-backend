@@ -201,7 +201,7 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 					return undefined;
 				},
 			},
-			tx_hash: { type: "string" },
+			tx_hashes: { type: "array" },
 			twitter: {
 				type: "object",
 				optional: false,
@@ -235,17 +235,17 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 	hooks: {
 		before: {
 			create(ctx: Context<Partial<LotteryDTO>>) {
-				const { tx_hash } = ctx.params;
+				const { tx_hashes } = ctx.params;
 
-				// Map the array of strings tx_hash to array of objects
-				ctx.params.tx_hash = (tx_hash as string[]).map((hash: string) => ({value: hash, status: 'PENDING'}));
+				// Map the array of strings tx_hashes to array of objects
+				ctx.params.transactions = tx_hashes?.map((hash: string) => ({hash, status: 'PENDING'}));
 			}
 		},
 		after: {
 			async create(ctx: Context<Partial<LotteryDTO>>, lotteryEntity: LotteryEntity) {
 				const { _id, 
 					asset_choice,
-					tx_hash,
+					transactions,
 					distribution_method,
 					wallet,
 					num_of_winners,
@@ -258,7 +258,7 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 				if (process.env.NODE_ENV === "production") {
 					const tokenType = (asset_choice === TOKEN_TYPE.MATIC ? 'MATIC' : 'ETH');
 
-					const success = await ctx.service?.waitForTransactions(tx_hash, tokenType);
+					const success = await ctx.service?.waitForTransactions(transactions, tokenType);
 
 					if (success) {
 						const data = {

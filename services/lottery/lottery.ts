@@ -118,7 +118,8 @@ const lotterySchema = new Schema<LotterySettings>(
 		},
 		transactions: {
 			type: [{ hash: String, status: String }],
-			required: true
+			required: true,
+			default: undefined
 		},
 		participants: {
 			type: [{ id: String, text: String }],

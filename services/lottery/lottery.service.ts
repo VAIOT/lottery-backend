@@ -48,6 +48,7 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 			"participants",
 			"num_of_winners",
 			"asset_choice",
+			"transactions",
 			"twitter",
 			"lottery_end",
 			"createdAt",

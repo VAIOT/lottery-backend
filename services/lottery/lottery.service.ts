@@ -308,7 +308,7 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 				};
 				const serviceName = (asset_choice === TOKEN_TYPE.MATIC ? 'matic' : 'erc').toLowerCase();
 				await this.broker.call(`v1.${ serviceName }.openLottery`, data);
-				await this.service.activateLottery(_id);
+				await this.activateLottery(_id);
 			} else {
 				// TODO emergency payout
 			}

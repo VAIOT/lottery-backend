@@ -3,7 +3,7 @@ import { ERC20_TYPE, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from "./enums";
 import type { IERC20, IERC721, IMATIC } from "./interfaces/lottery";
 import type { ITwitter } from "./interfaces/twitter";
 
-export type LotteryDTO = ((IERC20 | IERC721 | IMATIC) | { tx_hash: string[] }) & { twitter: ITwitter };
+export type LotteryDTO = ((IERC20 | IERC721 | IMATIC) & { tx_hashes: string[] }) & { twitter: ITwitter };
 export type LotteryEntity = (IERC20 | IERC721 | IMATIC) & { _id: string, lottery_end: Date; createdAt: Date, twitter: ITwitter };
 
 type LotterySettings = IERC20 &
@@ -116,8 +116,8 @@ const lotterySchema = new Schema<LotterySettings>(
 			required: false,
 			default: false,
 		},
-		tx_hash: {
-			type: [{ value: String, status: String }],
+		transactions: {
+			type: [{ hash: String, status: String }],
 			required: true
 		},
 		participants: {

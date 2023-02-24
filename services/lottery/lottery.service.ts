@@ -289,18 +289,18 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 	 * Methods
 	 */
 	methods: {
-		async waitForTransactions(this: LotteryThis, transactions: { value: string, status: string }[], tokenType: "MATIC" | "ETH") {
+		async waitForTransactions(this: LotteryThis, transactions: { hash: string, status: string }[], tokenType: "MATIC" | "ETH") {
 			let timedOut = false;
 			setTimeout(() => { timedOut = true }, 15 * 60 * 1000);
 
-			const success = await asyncEvery(transactions, async ({status, value}) => {
+			const success = await asyncEvery(transactions, async ({status, hash}) => {
 				let result = status;
 
 				while(result === "PENDING") {
 					await sleep(5000);
 
 					result = !timedOut
-					? (await this.broker.call(`v1.tx.getTxStatus`, { tokenType, txHash: value }) as { result: string }).result
+					? (await this.broker.call(`v1.tx.getTxStatus`, { tokenType, txHash: hash }) as { result: string }).result
 					: "STUCK"
 				}
 				return result === "SUCCESS";

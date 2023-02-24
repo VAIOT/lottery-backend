@@ -1,6 +1,6 @@
+/* eslint-disable no-await-in-loop */
 /**
  * Check if object property exist in array.
- *
  * @function
  * @template T, V
  * @param {T} object - any object
@@ -24,4 +24,17 @@ async function sleep(milliseconds: number): Promise<void> {
 	});
 }
 
-export { hasProperty, sleep }
+/**
+ * .every async alternative.
+ * @param arr array of items to iterate through.
+ * @param predicate fn used to evaluate the element.
+ * @returns true if all elements evaluate to true, otherwise returns false.
+ */
+async function asyncEvery<T>(arr: T[], predicate: (values: T) => Promise<boolean>): Promise<boolean> {
+	for (const e of arr) {
+		if (!await predicate(e)) { return false }
+	}
+	return true;
+};
+
+export { hasProperty, sleep, asyncEvery }

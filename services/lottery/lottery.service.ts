@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 /* eslint-disable @typescript-eslint/no-implied-eval */
-import type { ActionSchema, Context, LoggerInstance, Service, ServiceSchema } from "moleculer";
+import type { Context, Service, ServiceSchema } from "moleculer";
 import type { DbServiceSettings, MoleculerDbMethods } from "moleculer-db";
 import DbService from "moleculer-db";
 import MongooseAdapter from "moleculer-db-adapter-mongoose";
 import { ERC20_TYPE, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from "./enums";
-import type { LotteryEntity } from "./lottery";
+import type { LotteryDTO, LotteryEntity } from "./lottery";
 import { lottery } from "./lottery";
-import { sleep } from "./utils";
+import { asyncEvery, sleep } from "./utils";
 
 const regex = {
 	twitter: {
@@ -233,47 +233,53 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 	 * Hooks
 	 */
 	hooks: {
-		after: {
-			async create(ctx: Context<LotteryEntity>, savedLottery: LotteryEntity) {
-				const { 
-					distribution_method, 
-					wallet, num_of_winners,
-					distribution_options, 
-					number_of_tokens, 
-					final_rewards, 
-					asset_choice,
-					tx_hash } = ctx.params;
-				
-				// TODO fix this
-				const logger = (this.logger as unknown as LoggerInstance);
-				
-				(this.logger as any).debug(`Lottery #${savedLottery._id} saved in db.`);
+		before: {
+			create(ctx: Context<Partial<LotteryDTO>>) {
+				const { tx_hash } = ctx.params;
 
-				const data = {
-					lotteryType: distribution_method, // SPLIT OR PERCENTAGE
-					author: wallet,
-					numOfWinners: num_of_winners, 
-					rewardAmounts: distribution_options,
-					totalReward: number_of_tokens,
-					finalRewards: final_rewards,
-					rewardProportions: distribution_options,
-				};
+				// Map the array of strings tx_hash to array of objects
+				ctx.params.tx_hash = (tx_hash as string[]).map((hash: string) => ({value: hash, status: 'PENDING'}));
+			}
+		},
+		after: {
+			async create(ctx: Context<Partial<LotteryDTO>>, lotteryEntity: LotteryEntity) {
+				const { _id, 
+					asset_choice,
+					tx_hash,
+					distribution_method,
+					wallet,
+					num_of_winners,
+					distribution_options,
+					number_of_tokens,
+					final_rewards } = lotteryEntity;
+
+				ctx.service?.logger.info(`New lottery #${_id} created!`);
 
 				if (process.env.NODE_ENV === "production") {
-					(this.logger as any).debug(`Lottery #${savedLottery._id} opening...`);
-					// Call service
-					const serviceName = (asset_choice === TOKEN_TYPE.MATIC ? 'matic' : 'erc').toLowerCase();
-					await ctx.call(`v1.${ serviceName }.openLottery`, data);
+					const tokenType = (asset_choice === TOKEN_TYPE.MATIC ? 'MATIC' : 'ETH');
 
-					(this.logger as any).debug(`Lottery #${savedLottery._id} opened.`);
+					const success = await ctx.service?.waitForTransactions(tx_hash, tokenType);
+
+					if (success) {
+						const data = {
+							lotteryType: distribution_method, // SPLIT OR PERCENTAGE
+							author: wallet,
+							numOfWinners: num_of_winners, 
+							rewardAmounts: distribution_options,
+							totalReward: number_of_tokens,
+							finalRewards: final_rewards,
+							rewardProportions: distribution_options,
+						};
+						const serviceName = (asset_choice === TOKEN_TYPE.MATIC ? 'matic' : 'erc').toLowerCase();
+						await ctx.call(`v1.${ serviceName }.openLottery`, data);
+					} else {
+						// TODO emergency payout
+						return { result: false };
+					}
 				}
-				
-				// Activate lottery 
-				await (this.actions as ActionSchema).update({ id: savedLottery._id, active: true });
-
-				// Return lottery 
-				return savedLottery;
-			}
+				await ctx.service?.activateLottery(_id);
+				return { result: true };
+			},
 		}
 	},
 
@@ -281,6 +287,22 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 	 * Methods
 	 */
 	methods: {
+		async waitForTransactions(this: LotteryThis, transactions: { value: string, status: string }[], tokenType: "MATIC" | "ETH") {
+			const success = await asyncEvery(transactions, async ({status, value}) => {
+				let result = status;
+
+				await sleep(4000);
+				while(result === "PENDING") {
+					await sleep(1000);
+
+					result = (await this.broker.call(`v1.tx.getTxStatus`, { tokenType, txHash: value }) as { result: string }).result;
+				}
+				return result === "SUCCESS";
+			});
+
+			return success;
+		},
+
 		async checkIfLotteryExists(this: LotteryThis, serviceName: string, lotteryId: number) {
 			if (process.env.NODE_ENV === "development") {
 				return true;
@@ -293,6 +315,12 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 		},
 		deactivateLottery(this: LotteryThis, lotteryId: number) {
 			return this.adapter.updateById(lotteryId, { active: false }).exec();
+		},
+		async activateLottery(this: LotteryThis, lotteryId: number) {
+			const a = await this.adapter.findById(lotteryId);
+			await a.assignLotteryId();
+			a.active = true;
+			return a.save();
 		},
 
 		async findAndStartLotteries(this: LotteryThis) {
@@ -323,37 +351,30 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 							continue;
 						}
 						
-						if (wallets.length > 0) {
+						// call services to pick winner(s)
+						const addParticipantsResponse = await this.broker.call(`v1.${ serviceName }.addParticipants`, { lotteryId, participants: participants.map(({text}) => text) }, { timeout: 0 }) as { status: string, value: string };
+						this.logger.debug('Participants added!');
 
-							// call services to pick winner(s)
-							this.logger.info('Before addParticipants');
-							const addParticipantsResponse = await this.broker.call(`v1.${ serviceName }.addParticipants`, { lotteryId, participants: participants.map(({text}) => text) }, { timeout: 0 }) as { status: string };
-							this.logger.info('After addParticipants');
-
-							if (addParticipantsResponse.status !== "OK") {
-								this.deactivateLottery(endedLottery._id);
-								continue;
-							}
-							await sleep(15000);
-
-							this.logger.info('Before pickRandomNumber');
-							const pickRandomNumberResponse = await this.broker.call(`v1.${ serviceName }.pickRandomNumber`, { lotteryId }, { timeout: 0 }) as { randomNumber: number | { status: null }};
-							this.logger.info('After pickRandomNumber');
-
-							if (typeof pickRandomNumberResponse.randomNumber === "object") {
-								continue;
-							}
-
-							await this.broker.call(`v1.${ serviceName }.payoutWinners`, { lotteryId, _id: endedLottery._id }, { timeout: 0 });
-						} else {
-							// TODO emergency payout
+						if (addParticipantsResponse.status !== "OK") {
+							this.deactivateLottery(endedLottery._id);
+							continue;
 						}
+						await sleep(15000);
+
+						const pickRandomNumberResponse = await this.broker.call(`v1.${ serviceName }.pickRandomNumber`, { lotteryId }, { timeout: 0 }) as { status: string, value: string | number };
+						this.logger.debug('Picked random number!');
+
+						if (pickRandomNumberResponse.status !== "OK") {
+							this.deactivateLottery(endedLottery._id);
+							continue;
+						}
+
+						await this.broker.call(`v1.${ serviceName }.payoutWinners`, { lotteryId, _id: endedLottery._id }, { timeout: 0 });
 
 						// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
 						const winningWallets = await this.broker.call(`v1.${ serviceName }.getWinnersOfLottery`, { lotteryId }, { timeout: 0 }) as string[];
 					
-						console.log("Winning wallets:", winningWallets)
-						// TODO addPost()
+						this.sendTelegramMessage(winningWallets, endedLottery.asset_choice, lotteryId);
 					}
 
 					// Set the lottery's active state to false
@@ -368,17 +389,16 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 			setTimeout(this.findAndStartEndedLotteries, 15 * 60 * 1000); 
 		},
 
-		addPost(this: LotteryThis, winningWallets: string[], lotteryAsset: string, lotteryId: number) {
+		sendTelegramMessage(this: LotteryThis, winningWallets: string[], lotteryAsset: string, lotteryId: number) {
 			
 			const postText = winningWallets.length > 0
 			? `Winning wallets in lottery #${lotteryId} asset: ${lotteryAsset} are: ${winningWallets.join(', ')}`
 			: `Lottery #${lotteryId} asset: ${lotteryAsset} ended with no winners; No participants.`;
 
-			// Post lottery results to Twitter
-			const postId = await this.broker.call("v1.twitter.addPost", { content: postText }, { timeout: 0 });
-									
-			// Log the post ID
-			this.logger.debug(`Post added! Id: ${postId}.`);
+			console.log(postText);
+			// TODO post lottery results to Telegram
+
+			this.logger.debug(`Telegram message sent!`);
 		},
 
 		async getParticipants(this: LotteryThis, endedLottery: LotteryEntity) {

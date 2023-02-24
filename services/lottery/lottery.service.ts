@@ -245,42 +245,18 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 			}
 		},
 		after: {
-			async create(ctx: Context<Partial<LotteryDTO>>, lotteryEntity: LotteryEntity) {
+			create(ctx: Context<Partial<LotteryDTO>>, lotteryEntity: LotteryEntity) {
 				const { _id, 
 					asset_choice,
-					transactions,
-					distribution_method,
-					wallet,
-					num_of_winners,
-					distribution_options,
-					number_of_tokens,
-					final_rewards } = lotteryEntity;
+					transactions } = lotteryEntity;
 
 				ctx.service?.logger.info(`New lottery #${_id} created!`);
 
 				if (process.env.NODE_ENV === "production") {
 					const tokenType = (asset_choice === TOKEN_TYPE.MATIC ? 'MATIC' : 'ETH');
 
-					const success = await ctx.service?.waitForTransactions(transactions, tokenType);
-
-					if (success) {
-						const data = {
-							lotteryType: distribution_method, // SPLIT OR PERCENTAGE
-							author: wallet,
-							numOfWinners: num_of_winners, 
-							rewardAmounts: distribution_options,
-							totalReward: number_of_tokens,
-							finalRewards: final_rewards,
-							rewardProportions: distribution_options,
-						};
-						const serviceName = (asset_choice === TOKEN_TYPE.MATIC ? 'matic' : 'erc').toLowerCase();
-						await ctx.call(`v1.${ serviceName }.openLottery`, data);
-					} else {
-						// TODO emergency payout
-						return { result: false };
-					}
+					ctx.service?.handleTransactions(transactions, tokenType, lotteryEntity);
 				}
-				await ctx.service?.activateLottery(_id);
 				return { result: true };
 			},
 		}
@@ -290,24 +266,50 @@ const LotteryService: ServiceSchema<DbServiceSettings> = {
 	 * Methods
 	 */
 	methods: {
-		async waitForTransactions(this: LotteryThis, transactions: { hash: string, status: string }[], tokenType: "MATIC" | "ETH") {
-			let timedOut = false;
-			setTimeout(() => { timedOut = true }, 15 * 60 * 1000);
+		async handleTransactions(this: LotteryThis, transactions: { hash: string, status: string }[], tokenType: "MATIC" | "ETH", lotteryEntity: LotteryEntity): Promise<void> {
+			const { _id,
+				asset_choice,
+				distribution_method,
+				wallet,
+				num_of_winners,
+				distribution_options,
+				number_of_tokens,
+				final_rewards } = lotteryEntity;
 
-			const success = await asyncEvery(transactions, async ({status, hash}) => {
-				let result = status;
+			const allTransactionsSuccessful = async () => {
+				let timedOut = false;
+				setTimeout(() => { timedOut = true }, 15 * 60 * 1000);
 
-				while(result === "PENDING") {
-					await sleep(5000);
+				return asyncEvery(transactions, async ({status, hash}) => {
+					let result = status;
 
-					result = !timedOut
-					? (await this.broker.call(`v1.tx.getTxStatus`, { tokenType, txHash: hash }) as { result: string }).result
-					: "STUCK"
-				}
-				return result === "SUCCESS";
-			});
+					while(result === "PENDING") {
+						await sleep(5000);
 
-			return success;
+						result = !timedOut
+						? (await this.broker.call(`v1.tx.getTxStatus`, { tokenType, txHash: hash }) as { result: string }).result
+						: "STUCK"
+					}
+					return result === "SUCCESS";
+				});
+			}
+
+			if (await allTransactionsSuccessful()) {
+				const data = {
+					lotteryType: distribution_method, // SPLIT OR PERCENTAGE
+					author: wallet,
+					numOfWinners: num_of_winners, 
+					rewardAmounts: distribution_options,
+					totalReward: number_of_tokens,
+					finalRewards: final_rewards,
+					rewardProportions: distribution_options,
+				};
+				const serviceName = (asset_choice === TOKEN_TYPE.MATIC ? 'matic' : 'erc').toLowerCase();
+				await this.broker.call(`v1.${ serviceName }.openLottery`, data);
+				await this.service?.activateLottery(_id);
+			} else {
+				// TODO emergency payout
+			}
 		},
 
 		async checkIfLotteryExists(this: LotteryThis, serviceName: string, lotteryId: number) {

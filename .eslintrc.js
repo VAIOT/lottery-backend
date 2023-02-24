@@ -152,6 +152,7 @@ module.exports = {
 				"@typescript-eslint/no-unsafe-return": "off",
 				"@typescript-eslint/restrict-template-expressions": "off",
 				"@typescript-eslint/unbound-method": "off",
+				'@typescript-eslint/no-namespace': 'off',
 
 				// force explicit member accessibility modifiers
 				"@typescript-eslint/explicit-member-accessibility": ["error", { accessibility: "no-public" }],

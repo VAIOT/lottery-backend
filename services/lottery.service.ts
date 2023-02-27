@@ -1,3 +1,4 @@
+/* eslint-disable no-param-reassign */
 /* eslint-disable no-void */
 /* eslint-disable no-await-in-loop */
 /* eslint-disable @typescript-eslint/no-misused-promises */
@@ -7,7 +8,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { lottery } from '@Entities/lottery';
 import { ILottery } from '@Interfaces/index';
-import { asyncEvery, sleep } from '@Meta';
+import { sleep } from '@Meta';
 import { ERC20_TYPE, PAYMENT_STATUS, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from '@Meta/enums';
 import type { Context} from 'moleculer';
 import { Service as MoleculerService } from 'moleculer';
@@ -249,25 +250,25 @@ class LotteryService extends MoleculerService {
             number_of_tokens,
             final_rewards } = lotteryEntity;
 
-        const allTransactionsSuccessful = async () => {
-            let timedOut = false;
-            setTimeout(() => { timedOut = true }, 15 * 60 * 1000);
+        let timedOut = false;
+        setTimeout(() => { timedOut = true }, 15 * 60 * 1000);
 
-            return asyncEvery(transactions, async ({status, hash}) => {
-                let result = status;
+        transactions = await Promise.all(transactions.map(async ({status, hash}) => {
+            while(status === PAYMENT_STATUS.PENDING) {
+                await sleep(5000);
 
-                while(result === PAYMENT_STATUS.PENDING) {
-                    await sleep(5000);
+                status = !timedOut
+                ? ((await this.broker.call(`v1.tx.getTxStatus`, { tokenType, txHash: hash })) as any).result
+                : PAYMENT_STATUS.STUCK
+            }
+            return { hash, status }
+        }));
 
-                    result = !timedOut
-                    ? ((await this.broker.call(`v1.tx.getTxStatus`, { tokenType, txHash: hash })) as any).result
-                    : PAYMENT_STATUS.STUCK
-                }
-                return result === PAYMENT_STATUS.SUCCESS;
-            });
-        }
+        this.adapter.updateById(_id, { transactions }).exec();
 
-        if (await allTransactionsSuccessful()) {
+        const allTransactionsSuccessful = transactions.every(({status}) => status === PAYMENT_STATUS.SUCCESS);
+
+        if (allTransactionsSuccessful) {
             const data = {
                 lotteryType: distribution_method, // SPLIT OR PERCENTAGE
                 author: wallet,
@@ -278,8 +279,12 @@ class LotteryService extends MoleculerService {
                 rewardProportions: distribution_options,
             };
             const serviceName = (asset_choice === TOKEN_TYPE.MATIC ? 'matic' : 'erc').toLowerCase();
-            await this.broker.call(`v1.${ serviceName }.openLottery`, data);
-            await this.activateLottery(_id);
+
+            if (await this.activateLottery(_id)) {
+                await this.broker.call(`v1.${ serviceName }.openLottery`, data);
+            } else {
+                this.logger.error("Couldn't activate lottery.")
+            }
         } else {
             this.emergencyPayout(wallet);
         }

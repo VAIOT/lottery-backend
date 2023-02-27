@@ -77,15 +77,25 @@ class TwitterService extends MoleculerService {
 	}
 
 	@Action({ params: { postUrl: "string" }, visibility: "protected" })
-	async checkIfTweetExists(ctx: Context<ITwitter.TwitterInDto.post>): Promise<boolean> {
+	async checkIfTweetExists(ctx: Context<ITwitter.TwitterInDto.post>): Promise<boolean | null> {
 		const { postUrl } = ctx.params;
-		return this.checkIfTweetExistsMethod(postUrl);
+		try {
+			return await this.checkIfTweetExistsMethod(postUrl);
+		} catch(e) {
+			this.logger.error(e);
+			return null;
+		}
 	}
 
 	@Action({ params: { userName: "string" }, visibility: "protected" })
-	async checkIfUserExists(ctx: Context<ITwitter.TwitterInDto.user>): Promise<boolean> {
+	async checkIfUserExists(ctx: Context<ITwitter.TwitterInDto.user>): Promise<boolean | null> {
 		const { userName } = ctx.params;
-		return this.checkIfUserExistsMethod(userName);
+		try {
+			return await this.checkIfUserExistsMethod(userName);
+		} catch(e) {
+			this.logger.error(e);
+			return null;
+		}
 	}
 
 
@@ -112,9 +122,7 @@ class TwitterService extends MoleculerService {
         
         const commentsData = await twitter.apiV2.getTweetComments(tweetData.conversation_id as string);
 
-        let comments = commentsData.data.data
-        ? commentsData.data.data.map(({text, author_id}) => ({text, author_id: author_id ?? '' }))
-        : []
+        let comments = commentsData.data.data.map(({text, author_id}) => ({text, author_id: author_id ?? '' }));
 
         if (comments.length) {
             if (removeTweetAuthor) {
@@ -133,18 +141,14 @@ class TwitterService extends MoleculerService {
 	async getTweetLikesMethod(tweetUrl: string): Promise<string[]> { // v2
         const likes = await twitter.apiV2.getTweetLikes(twitter.getPostId(tweetUrl));
 
-        return likes.data.data
-        ? likes.data.data.flatMap(({id}) => id)
-        : []
+        return likes.data.data.flatMap(({id}) => id);
     }
 
 	@Method
     async getTweetRetweetsMethod(tweetUrl: string): Promise<string[]> { // v2
         const retweets = await twitter.apiV2.getRetweets(twitter.getPostId(tweetUrl));
 
-        return retweets.data.data
-        ? retweets.data.data.flatMap(({id}) => id)
-        : []
+        return retweets.data.data.flatMap(({id}) => id);
     }
 
 	@Method
@@ -158,9 +162,7 @@ class TwitterService extends MoleculerService {
     async searchTweetsMethod(content: string, dateFrom: Date): Promise<string[]> { // v2
         const search = await twitter.apiV2.searchTweets(content, dateFrom);
 
-        return search.data.data
-        ? search.data.data.flatMap(({author_id}) => author_id ?? '')
-        : []
+        return search.data.data.flatMap(({author_id}) => author_id ?? '');
     }
 
 	@Method

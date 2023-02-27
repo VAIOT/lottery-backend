@@ -7,8 +7,8 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { lottery } from '@Entities/lottery';
 import { ILottery } from '@Interfaces/index';
-import { ERC20_TYPE, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from '@Meta/enums';
-import { asyncEvery, sleep } from '@Meta/utils';
+import { asyncEvery, sleep } from '@Meta';
+import { ERC20_TYPE, PAYMENT_STATUS, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from '@Meta/enums';
 import type { Context} from 'moleculer';
 import { Service as MoleculerService } from 'moleculer';
 import DbService from "moleculer-db";
@@ -209,8 +209,8 @@ const regex = {
 			create(ctx: Context<ILottery.LotteryDTO>) {
 				const { tx_hashes } = ctx.params;
 
-				// Map the array of strings tx_hashes to array of objects
-				ctx.params.transactions = tx_hashes?.map((hash: string) => ({hash, status: 'PENDING'}));
+				// Map the tx_hashes <array of strings> to transactions <array of objects>
+				ctx.params.transactions = tx_hashes?.map((hash: string) => ({hash, status: PAYMENT_STATUS.PENDING}));
 			}
 		},
 		after: {
@@ -238,7 +238,7 @@ const regex = {
 class LotteryService extends MoleculerService {
     
     @Method
-    async handleTransactions(transactions: { hash: string, status: string }[], tokenType: "MATIC" | "ETH", lotteryEntity: ILottery.LotteryEntity): Promise<void> {
+    async handleTransactions(transactions: { hash: string, status: PAYMENT_STATUS }[], tokenType: "MATIC" | "ETH", lotteryEntity: ILottery.LotteryEntity): Promise<void> {
         const { _id,
             asset_choice,
             distribution_method,
@@ -255,14 +255,14 @@ class LotteryService extends MoleculerService {
             return asyncEvery(transactions, async ({status, hash}) => {
                 let result = status;
 
-                while(result === "PENDING") {
+                while(result === PAYMENT_STATUS.PENDING) {
                     await sleep(5000);
 
                     result = !timedOut
                     ? ((await this.broker.call(`v1.tx.getTxStatus`, { tokenType, txHash: hash })) as any).result
-                    : "STUCK"
+                    : PAYMENT_STATUS.STUCK
                 }
-                return result === "SUCCESS";
+                return result === PAYMENT_STATUS.SUCCESS;
             });
         }
 

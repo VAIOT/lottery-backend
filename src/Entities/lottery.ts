@@ -1,6 +1,6 @@
 /* eslint-disable import/prefer-default-export */
 import type { IERC20, IERC721, IMATIC, TwitterDto } from "@Interfaces";
-import { ERC20_TYPE, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from "@Meta";
+import { ERC20_TYPE, PAYMENT_STATUS, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from "@Meta";
 import { model, Schema } from "mongoose";
 
 type LotterySettings = IERC20 &
@@ -102,7 +102,7 @@ const lotterySchema = new Schema<LotterySettings>(
 			default: false,
 		},
 		transactions: {
-			type: [{ hash: String, status: String }],
+			type: [{ hash: String, status: { type: String, enum: PAYMENT_STATUS } }],
 			required: true,
 			default: undefined
 		},

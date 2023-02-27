@@ -1,4 +1,4 @@
-import type { ERC20_TYPE, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from "@Meta/enums";
+import type { ERC20_TYPE, PAYMENT_STATUS, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from "@Meta/enums";
 
 export namespace ILottery {
 	export type LotteryDTO = ((IERC20 | IERC721 | IMATIC) & { tx_hashes: string[] }) & { twitter: TwitterDto };
@@ -15,7 +15,7 @@ export interface TwitterDto {
 
 type Tx = {
 	hash: string,
-	status: string
+	status: PAYMENT_STATUS
 }
 
 interface ILotteryBase {

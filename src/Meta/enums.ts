@@ -14,3 +14,10 @@ export enum ERC20_TYPE {
     USDC = "USDC", 
     ETH = "ETH" 
 };
+
+export enum PAYMENT_STATUS {
+    PENDING = "PENDING",
+    SUCCESS = "SUCCESS",
+    FAILED  = "FAILED",
+    STUCK   = "STUCK"
+};

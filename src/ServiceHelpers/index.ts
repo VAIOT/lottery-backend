@@ -1,1 +1,1 @@
-export * from '@ServiceHelpers/twitter';
+export * from '@ServiceHelpers/Twitter';

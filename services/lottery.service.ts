@@ -311,10 +311,12 @@ class LotteryService extends MoleculerService {
 
     @Method
     async activateLottery(lotteryId: string) {
-        const a = await this.adapter.findById(lotteryId);
-        await a.assignLotteryId();
-        a.active = true;
-        return a.save();
+        const lotteryEntity = await this.adapter.findById(lotteryId);
+
+        await lotteryEntity.assignLotteryId();
+        lotteryEntity.active = true;
+
+        return lotteryEntity.save();
     }
 
     @Method
@@ -335,7 +337,6 @@ class LotteryService extends MoleculerService {
                     const newParticipants = await this.getParticipants(endedLottery);
 
                     if (!newParticipants) {
-                        this.deactivateLottery(endedLottery._id);
                         continue;
                     }
                     participants = newParticipants;
@@ -400,7 +401,7 @@ class LotteryService extends MoleculerService {
 
     @Method
     async getParticipants(endedLottery: ILottery.LotteryEntity) {
-        const { createdAt, twitter, wallet } = endedLottery;
+        const { createdAt, twitter, wallet, _id } = endedLottery;
         const { wallet_post, ...reqs } = twitter;
         const twitterRequirements = Object.entries(reqs);
 
@@ -416,7 +417,7 @@ class LotteryService extends MoleculerService {
                         if (await this.broker.call("v1.twitter.checkIfTweetExists", { postUrl: value }, { timeout: 0 })) {
                             participants = await this.broker.call("v1.twitter.likedBy", { postUrl: value }, { timeout: 0 });
                         } else {
-                            this.emergencyPayout(wallet);
+                            this.emergencyPayout(wallet, _id);
                             return null;
                         }
                         break;
@@ -427,7 +428,7 @@ class LotteryService extends MoleculerService {
                         if (await this.broker.call("v1.twitter.checkIfTweetExists", { postUrl: value }, { timeout: 0 })) {
                             participants = await this.broker.call("v1.twitter.retweetedBy", { postUrl: value }, { timeout: 0 });
                         } else {
-                            this.emergencyPayout(wallet);
+                            this.emergencyPayout(wallet, _id);
                             return null;
                         }
                         break;
@@ -435,7 +436,7 @@ class LotteryService extends MoleculerService {
                         if (await this.broker.call("v1.twitter.checkIfUserExists", { userName: value }, { timeout: 0 })) {
                             participants = await this.broker.call("v1.twitter.followedBy", { userName: value }, { timeout: 0 });
                         } else {
-                            this.emergencyPayout(wallet);
+                            this.emergencyPayout(wallet, _id);
                             return null;
                         }
                         break;
@@ -473,7 +474,10 @@ class LotteryService extends MoleculerService {
     }
 
     @Method
-    emergencyPayout(wallet: string) {
+    emergencyPayout(wallet: string, lotteryId = "") {
+        if (lotteryId) {
+            this.deactivateLottery(lotteryId);
+        }
         // TODO 
     }
     

@@ -4,13 +4,11 @@
 /* eslint-disable no-continue */
 import { ApiResponseError, TwitterApi } from "twitter-api-v2";
 
-type ApiVersion = "v1" | "v2";
-
-export default class<T extends ApiVersion> {
-    protected api: TwitterApi[T];
+export default class {
+    protected api;
     
-    constructor(version: T) {
-        this.api = new TwitterApi(<string>process.env.TWITTER_TOKEN)[version];
+    constructor() {
+        this.api = new TwitterApi(<string>process.env.TWITTER_TOKEN);
     }
 
     protected async autoRetryOnRateLimitError<R>(callback: () => R | Promise<R>){

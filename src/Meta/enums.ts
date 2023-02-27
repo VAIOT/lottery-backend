@@ -16,8 +16,9 @@ export enum ERC20_TYPE {
 };
 
 export enum PAYMENT_STATUS {
-    PENDING = "PENDING",
-    SUCCESS = "SUCCESS",
-    FAILED  = "FAILED",
-    STUCK   = "STUCK"
+    PENDING  = "PENDING",
+    SUCCESS  = "SUCCESS",
+    FAILED   = "FAILED",
+    STUCK    = "STUCK",
+    PAID_OUT = "PAID_OUT"
 };

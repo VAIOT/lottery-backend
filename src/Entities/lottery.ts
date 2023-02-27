@@ -1,14 +1,11 @@
+/* eslint-disable import/prefer-default-export */
+import type { IERC20, IERC721, IMATIC, TwitterDto } from "@Interfaces";
+import { ERC20_TYPE, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from "@Meta";
 import { model, Schema } from "mongoose";
-import { ERC20_TYPE, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from "./enums";
-import type { IERC20, IERC721, IMATIC } from "./interfaces/lottery";
-import type { ITwitter } from "./interfaces/twitter";
-
-export type LotteryDTO = ((IERC20 | IERC721 | IMATIC) & { tx_hashes: string[] }) & { twitter: ITwitter };
-export type LotteryEntity = (IERC20 | IERC721 | IMATIC) & { _id: string, lottery_end: Date; createdAt: Date, twitter: ITwitter };
 
 type LotterySettings = IERC20 &
 	IERC721 &
-	IMATIC & { twitter: ITwitter; lottery_end: Date; active: boolean, createdAt: Date, updatedAt: Date };
+	IMATIC & { twitter: TwitterDto; lottery_end: Date; active: boolean, createdAt: Date, updatedAt: Date };
 	
 
 const lotterySchema = new Schema<LotterySettings>(
@@ -65,22 +62,10 @@ const lotterySchema = new Schema<LotterySettings>(
 			type: String,
 			enum: ERC20_TYPE,
 			default: undefined,
-			required: [
-				function (this: IERC20) {
-					return this.asset_choice === TOKEN_TYPE.ERC20;
-				},
-				"erc20_choice is required if asset_choice is ERC20",
-			],
 		},
 		nfts_choice: {
 			type: [{ name: String, token_id: Number, contract_address: String }],
 			default: undefined,
-			required: [
-				function (this: IERC721) {
-					return this.asset_choice === TOKEN_TYPE.ERC721;
-				},
-				"nfts_choice is required if asset_choice is ERC721",
-			],
 		},
 		twitter: {
 			type: Object,

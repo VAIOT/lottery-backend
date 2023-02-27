@@ -6,6 +6,7 @@ import Telegram from 'moleculer-telegram-bot';
 
 @Service({ 
 	name: "telegram",
+	version: 1,
 	mixins: [Telegram()]
 })
 class TelegramService extends MoleculerService {

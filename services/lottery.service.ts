@@ -335,6 +335,7 @@ class LotteryService extends MoleculerService {
                     const newParticipants = await this.getParticipants(endedLottery);
 
                     if (!newParticipants) {
+                        this.deactivateLottery(endedLottery._id);
                         continue;
                     }
                     participants = newParticipants;
@@ -374,11 +375,13 @@ class LotteryService extends MoleculerService {
                         this.deactivateLottery(endedLottery._id);
                         continue;
                     }
+                    await sleep(15000);
 
                     await this.broker.call(`v1.${ serviceName }.payoutWinners`, { lotteryId, _id: endedLottery._id }, { timeout: 0 });
 
-                    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-                    const winningWallets = await this.broker.call(`v1.${ serviceName }.getWinnersOfLottery`, { lotteryId }, { timeout: 0 }) as string[];
+                    await sleep(5000);
+
+                    const winningWallets: string[] = await this.broker.call(`v1.${ serviceName }.getWinnersOfLottery`, { lotteryId }, { timeout: 0 });
                 
                     this.sendTelegramMessage(winningWallets, endedLottery.asset_choice, lotteryId);
                 }

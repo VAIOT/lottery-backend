@@ -232,7 +232,8 @@ const regex = {
     },
     dependencies: [
         { name: "tx", version: 1 }, 
-		{ name: "twitter", version: 1 }
+		{ name: "twitter", version: 1 },
+        { name: "telegram", version: 1 }
     ]
 })
 class LotteryService extends MoleculerService {
@@ -280,7 +281,7 @@ class LotteryService extends MoleculerService {
             await this.broker.call(`v1.${ serviceName }.openLottery`, data);
             await this.activateLottery(_id);
         } else {
-            // TODO emergency payout
+            this.emergencyPayout(wallet);
         }
     }
 
@@ -320,17 +321,18 @@ class LotteryService extends MoleculerService {
             this.logger.debug(`Found ${endedLotteries.length} ended lotteries.`);
 
             for await (const endedLottery of endedLotteries) {
-                let { participants } = (await this.actions.find({ query: { _id: endedLottery._id } }))[0] as { participants: {author_id: string, text: string }[]};
+                let { participants } = (await this.actions.find({ query: { _id: endedLottery._id } }))[0] as { participants: {author_id: string, text: string }[] };
 
                 if (participants?.length > 0) {
                     this.logger.debug(`Found ${participants.length} participants in db.`);
                 } else {
                     // Get all participants
-                    participants = await this.getParticipants(endedLottery);
+                    const newParticipants = await this.getParticipants(endedLottery);
 
-                    if (!participants) {
+                    if (!newParticipants) {
                         continue;
                     }
+                    participants = newParticipants;
 
                     // Save to db
                     await this.actions.update({ id: endedLottery._id, participants });
@@ -389,21 +391,8 @@ class LotteryService extends MoleculerService {
     }
 
     @Method
-    sendTelegramMessage( winningWallets: string[], lotteryAsset: string, lotteryId: number) {
-        
-        const postText = winningWallets.length > 0
-        ? `Winning wallets in lottery #${lotteryId} asset: ${lotteryAsset} are: ${winningWallets.join(', ')}`
-        : `Lottery #${lotteryId} asset: ${lotteryAsset} ended with no winners; No participants.`;
-
-        console.log(postText);
-        // TODO post lottery results to Telegram
-
-        this.logger.debug(`Telegram message sent!`);
-    }
-
-    @Method
     async getParticipants(endedLottery: ILottery.LotteryEntity) {
-        const { createdAt, twitter } = endedLottery;
+        const { createdAt, twitter, wallet } = endedLottery;
         const { wallet_post, ...reqs } = twitter;
         const twitterRequirements = Object.entries(reqs);
 
@@ -416,16 +405,31 @@ class LotteryService extends MoleculerService {
                 let participants: string[] = [];
                 switch (key) {
                     case "like":
-                        participants = await this.broker.call("v1.twitter.likedBy", { postUrl: value }, { timeout: 0 });
+                        if (await this.broker.call("v1.twitter.checkIfTweetExists", { postUrl: value }, { timeout: 0 })) {
+                            participants = await this.broker.call("v1.twitter.likedBy", { postUrl: value }, { timeout: 0 });
+                        } else {
+                            this.emergencyPayout(wallet);
+                            return null;
+                        }
                         break;
                     case "content":
                         participants = await this.broker.call("v1.twitter.tweetedBy", { content: value, dateFrom: createdAt }, { timeout: 0 });
                         break;
                     case "retweet":
-                        participants = await this.broker.call("v1.twitter.retweetedBy", { postUrl: value }, { timeout: 0 });
+                        if (await this.broker.call("v1.twitter.checkIfTweetExists", { postUrl: value }, { timeout: 0 })) {
+                            participants = await this.broker.call("v1.twitter.retweetedBy", { postUrl: value }, { timeout: 0 });
+                        } else {
+                            this.emergencyPayout(wallet);
+                            return null;
+                        }
                         break;
                     case "follow":
-                        participants = await this.broker.call("v1.twitter.followedBy", { userName: value }, { timeout: 0 });
+                        if (await this.broker.call("v1.twitter.checkIfUserExists", { userName: value }, { timeout: 0 })) {
+                            participants = await this.broker.call("v1.twitter.followedBy", { userName: value }, { timeout: 0 });
+                        } else {
+                            this.emergencyPayout(wallet);
+                            return null;
+                        }
                         break;
                     default:
                         this.logger.error(`Unknown key ${key}`);
@@ -446,6 +450,23 @@ class LotteryService extends MoleculerService {
             baseParticipants = baseParticipants.filter(({author_id}) => filteredIds.includes(author_id));
         }
         return baseParticipants;
+    }
+
+    @Method
+    sendTelegramMessage( winningWallets: string[], lotteryAsset: string, lotteryId: number) {
+        
+        const lotteryMessage = winningWallets.length > 0
+        ? `Winning wallets in lottery #${lotteryId} asset: ${lotteryAsset} are: ${winningWallets.join(', ')}`
+        : `Lottery #${lotteryId} asset: ${lotteryAsset} ended with no winners; No participants.`;
+
+        this.broker.call("v1.telegram.sendMessage", { message: lotteryMessage }, { timeout: 0 })
+        .then(res => this.logger.debug(`Telegram message sent!`))
+        .catch(this.logger.error);
+    }
+
+    @Method
+    emergencyPayout(wallet: string) {
+        // TODO 
     }
     
 	started(): void {

@@ -376,7 +376,7 @@ class LotteryService extends MoleculerService {
                         this.deactivateLottery(endedLottery._id);
                         continue;
                     }
-                    await sleep(15000);
+                    await sleep(40000);
 
                     await this.broker.call(`v1.${ serviceName }.payoutWinners`, { lotteryId, _id: endedLottery._id }, { timeout: 0 });
 

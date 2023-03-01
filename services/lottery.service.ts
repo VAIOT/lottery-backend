@@ -341,7 +341,7 @@ class LotteryService extends MoleculerService {
                 this.logger.error("Couldn't activate lottery.")
             }
         } else {
-            this.emergencyPayout(wallet);
+            this.emergencyPayout(_id);
         }
     }
 
@@ -456,7 +456,7 @@ class LotteryService extends MoleculerService {
 
     @Method
     async getParticipants(endedLottery: ILottery.LotteryEntity) {
-        const { createdAt, twitter, wallet, _id } = endedLottery;
+        const { createdAt, twitter, _id } = endedLottery;
         const { wallet_post, ...reqs } = twitter;
         const twitterRequirements = Object.entries(reqs);
 
@@ -472,7 +472,8 @@ class LotteryService extends MoleculerService {
                         if (await this.broker.call("v1.twitter.getTweetData", { postUrl: value }, { timeout: 0 })) {
                             participants = await this.broker.call("v1.twitter.likedBy", { postUrl: value }, { timeout: 0 });
                         } else {
-                            this.emergencyPayout(wallet, _id);
+                            this.deactivateLottery(_id);
+                            this.emergencyPayout(_id);
                             return null;
                         }
                         break;
@@ -483,7 +484,8 @@ class LotteryService extends MoleculerService {
                         if (await this.broker.call("v1.twitter.getTweetData", { postUrl: value }, { timeout: 0 })) {
                             participants = await this.broker.call("v1.twitter.retweetedBy", { postUrl: value }, { timeout: 0 });
                         } else {
-                            this.emergencyPayout(wallet, _id);
+                            this.deactivateLottery(_id);
+                            this.emergencyPayout(_id);
                             return null;
                         }
                         break;
@@ -491,7 +493,8 @@ class LotteryService extends MoleculerService {
                         if (await this.broker.call("v1.twitter.getUserData", { userName: value }, { timeout: 0 })) {
                             participants = await this.broker.call("v1.twitter.followedBy", { userName: value }, { timeout: 0 });
                         } else {
-                            this.emergencyPayout(wallet, _id);
+                            this.deactivateLottery(_id);
+                            this.emergencyPayout(_id);
                             return null;
                         }
                         break;
@@ -529,10 +532,7 @@ class LotteryService extends MoleculerService {
     }
 
     @Method
-    emergencyPayout(wallet: string, lotteryId = "") {
-        if (lotteryId) {
-            this.deactivateLottery(lotteryId);
-        }
+    emergencyPayout(_id: string) {
         // TODO 
     }
     

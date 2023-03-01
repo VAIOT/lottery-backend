@@ -340,8 +340,6 @@ class LotteryService extends MoleculerService {
             } else {
                 this.logger.error("Couldn't activate lottery.")
             }
-        } else {
-            this.emergencyPayout(_id);
         }
     }
 

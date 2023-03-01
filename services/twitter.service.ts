@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 /* eslint-disable no-continue */
 import events from "events";
-import type { ITwitter } from "@Interfaces";
-import { twitter } from '@ServiceHelpers';
+import { ITwitter } from "@Interfaces";
+import { apiV1, apiV2, botometer, Consumer, getPostId } from '@ServiceHelpers';
 import { Context, Service as MoleculerService } from 'moleculer';
 import { Action, Method, Service } from "moleculer-decorators";
 import type { TweetV2, UserV2 } from "twitter-api-v2";
@@ -77,10 +77,11 @@ class TwitterService extends MoleculerService {
 	}
 
 	@Action({ params: { postUrl: "string" }, visibility: "protected" })
-	async checkIfTweetExists(ctx: Context<ITwitter.TwitterInDto.post>): Promise<boolean | null> {
+	async getTweetData(ctx: Context<ITwitter.TwitterInDto.post, ITwitter.TwitterInDto.meta>): Promise<TweetV2 | null> {
 		const { postUrl } = ctx.params;
+		const { tokens } = ctx.meta;
 		try {
-			return await this.checkIfTweetExistsMethod(postUrl);
+			return await this.getTweetDataMethod(getPostId(postUrl), tokens);
 		} catch(e) {
 			this.logger.error(e);
 			return null;
@@ -88,14 +89,31 @@ class TwitterService extends MoleculerService {
 	}
 
 	@Action({ params: { userName: "string" }, visibility: "protected" })
-	async checkIfUserExists(ctx: Context<ITwitter.TwitterInDto.user>): Promise<boolean | null> {
+	async getUserData(ctx: Context<ITwitter.TwitterInDto.user, ITwitter.TwitterInDto.meta>): Promise<UserV2 | null> {
 		const { userName } = ctx.params;
+		const { tokens } = ctx.meta;
 		try {
-			return await this.checkIfUserExistsMethod(userName);
+			return await this.getUserDataMethod(userName, tokens);
 		} catch(e) {
 			this.logger.error(e);
 			return null;
 		}
+	}
+
+	@Action({ visibility: "published", rest: { method: "GET", path: "/generateAuthLink" } })
+	async generateAuthLink(ctx: Context<undefined, {session: {[x: string]: string}}>): Promise<{ authLink: string }> {
+		const link = await new Consumer().generateAuthLink();
+
+		ctx.meta.session.oauthToken = link.oauth_token;
+		ctx.meta.session.oauthSecret = link.oauth_token_secret;
+
+		return { authLink: link.url };
+	}
+
+	@Action({ params: { tokens: "object" }, visibility: "protected" })
+	async getUserTokens(ctx: Context<{ tokens: ITwitter.TwitterInDto.tokens }>): Promise<any> {
+		const { savedSecret, savedToken, userVerifier } = ctx.params.tokens;
+		return new Consumer({accessToken: savedToken, accessSecret: savedSecret}).getUserTokens(userVerifier);
 	}
 
 
@@ -105,7 +123,7 @@ class TwitterService extends MoleculerService {
 
 		for await (const userId of usersIds) {
 			this.logger.debug(`Getting bot score for: ${userId}`);
-			const userScore = await twitter.botometer.getScoreFor(userId);
+			const userScore = await botometer.getScoreFor(userId);
 
 			if (userScore.cap?.universal > 0.94) {
 				this.logger.debug(`User removed from lottery: ${userId}`);
@@ -118,9 +136,9 @@ class TwitterService extends MoleculerService {
 
 	@Method
 	async getTweetCommentsMethod(tweetUrl: string, removeDuplicatedAuthors: boolean, removeTweetAuthor: boolean): Promise<{ text: string; author_id: string; }[]> { // v2
-        const tweetData = await this.getTweetDataMethod(twitter.getPostId(tweetUrl));
+        const tweetData = await this.getTweetDataMethod(getPostId(tweetUrl));
         
-        const commentsData = await twitter.apiV2.getTweetComments(tweetData.conversation_id as string);
+        const commentsData = await apiV2.getTweetComments(tweetData.conversation_id as string);
 
         let comments = commentsData.data.data.map(({text, author_id}) => ({text, author_id: author_id ?? '' }));
 
@@ -139,55 +157,44 @@ class TwitterService extends MoleculerService {
 
 	@Method
 	async getTweetLikesMethod(tweetUrl: string): Promise<string[]> { // v2
-        const likes = await twitter.apiV2.getTweetLikes(twitter.getPostId(tweetUrl));
+        const likes = await apiV2.getTweetLikes(getPostId(tweetUrl));
 
         return likes.data.data.flatMap(({id}) => id);
     }
 
 	@Method
     async getTweetRetweetsMethod(tweetUrl: string): Promise<string[]> { // v2
-        const retweets = await twitter.apiV2.getRetweets(twitter.getPostId(tweetUrl));
+        const retweets = await apiV2.getRetweets(getPostId(tweetUrl));
 
         return retweets.data.data.flatMap(({id}) => id);
     }
 
 	@Method
     async getUserFollowersMethod(userName: string): Promise<string[]> { // v1
-        const followers = await twitter.apiV1.getFollowers((await this.getUserDataMethod(userName)).id);
+        const followers = await apiV1.getFollowers((await this.getUserDataMethod(userName)).id);
 
         return followers.ids;
     }
 
 	@Method
     async searchTweetsMethod(content: string, dateFrom: Date): Promise<string[]> { // v2
-        const search = await twitter.apiV2.searchTweets(content, dateFrom);
+        const search = await apiV2.searchTweets(content, dateFrom);
 
         return search.data.data.flatMap(({author_id}) => author_id ?? '');
     }
 
 	@Method
-    async checkIfTweetExistsMethod(tweetUrl: string): Promise<boolean> {
-        return !!await this.getTweetDataMethod(twitter.getPostId(tweetUrl));
-    }
-
-	@Method
-    async checkIfUserExistsMethod(userName: string): Promise<boolean> {
-        return !!await this.getUserDataMethod(userName);
-    }
-
-	@Method
-    async getUserFollowersCountMethod(userName: string): Promise<number> {
-        return (await this.getUserDataMethod(userName)).public_metrics?.followers_count ?? 0;
-    }
-
-	@Method
-	async getTweetDataMethod(tweetId: string): Promise<TweetV2> {
-		return (await twitter.apiV2.getTweetData(tweetId)).data;
+	async getTweetDataMethod(tweetId: string, tokens?: ITwitter.TwitterInDto.tokens): Promise<TweetV2> {
+		return tokens
+		? (await apiV2.getTweetData(tweetId)).data
+		: (await new Consumer(tokens).getTweetData(tweetId)).data
 	}
 	
 	@Method
-	async getUserDataMethod(userName: string): Promise<UserV2> {
-		return (await twitter.apiV2.getUserData(userName)).data;
+	async getUserDataMethod(userName: string, tokens?: ITwitter.TwitterInDto.tokens): Promise<UserV2> {
+		return tokens
+		? (await apiV2.getUserData(userName)).data
+		: (await new Consumer(tokens).getUserData(userName)).data
 	}
 
 	started(): void {}

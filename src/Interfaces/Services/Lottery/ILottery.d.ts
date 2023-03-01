@@ -1,7 +1,7 @@
 import type { ERC20_TYPE, PAYMENT_STATUS, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from "@Meta/enums";
 
 export namespace ILottery {
-	export type LotteryDTO = ((IERC20 | IERC721 | IMATIC) & { tx_hashes: string[] }) & { twitter: TwitterDto };
+	export type LotteryDTO = (IERC20 | IERC721 | IMATIC) & { tx_hashes: string[]; twitter: TwitterDto; oauth_token: string; oauth_verifier: string; };
 	export type LotteryEntity = (IERC20 | IERC721 | IMATIC) & { _id: string, lottery_end: Date; createdAt: Date, twitter: TwitterDto };
 }
 

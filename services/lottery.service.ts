@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 /* eslint-disable no-param-reassign */
 /* eslint-disable no-void */
 /* eslint-disable no-await-in-loop */
@@ -10,11 +11,12 @@ import { lottery } from '@Entities/lottery';
 import { ILottery } from '@Interfaces/index';
 import { sleep } from '@Meta';
 import { ERC20_TYPE, PAYMENT_STATUS, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from '@Meta/enums';
-import type { Context} from 'moleculer';
+import type { Context, ServiceDependency} from 'moleculer';
 import { Service as MoleculerService } from 'moleculer';
 import DbService from "moleculer-db";
 import MongooseAdapter from "moleculer-db-adapter-mongoose";
 import { Method, Service } from 'moleculer-decorators';
+import type { TweetV2, UserV2 } from 'twitter-api-v2';
 
 const regex = {
 	twitter: {
@@ -36,6 +38,8 @@ const regex = {
     model: lottery,
     entityValidator: {
         duration: { type: "number", integer: true, positive: true },
+        oauth_token: { type: "string" },
+        oauth_verifier: { type: "string" },
         distribution_method: {
             type: "enum",
             values: Object.values(TOKEN_DISTRIBUTION_METHOD),
@@ -207,11 +211,58 @@ const regex = {
     },
     hooks: {
         before: {
-			create(ctx: Context<ILottery.LotteryDTO>) {
-				const { tx_hashes } = ctx.params;
+			async create(ctx: Context<ILottery.LotteryDTO, {session: {[x: string]: string|object}}>) {
+				const { tx_hashes, twitter, oauth_token, oauth_verifier } = ctx.params;
+
+                const tokensDto = {
+                    userVerifier: oauth_verifier,
+                    userToken: oauth_token,
+                    savedToken: ctx.meta.session.oauthToken,
+                    savedSecret: ctx.meta.session.oauthSecret
+                }
+
+                const tokens = await ctx.broker.call("v1.twitter.getUserTokens", { tokens: tokensDto }, { timeout: 0 });
+                ctx.meta.session.accessTokens = tokens as object;
+
+                if (twitter.follow) {
+                    const user = await ctx.broker.call("v1.twitter.getUserData", { userName: twitter.follow }, { meta: { tokens }, timeout: 0 }) as UserV2;
+                    if (!user) {
+                        throw new Error("User does not exist!");
+                    } else if (user.public_metrics?.followers_count?? 0 >= 1000000) {
+                        throw new Error("User cannot participate in the lottery!");
+                    }
+                }
+
+                const oneDay = new Date().getTime() + (1 * 24 * 60 * 60 * 1000);
+                if (twitter.like) {
+                    const tweet = await ctx.broker.call("v1.twitter.getTweetData", { postUrl: twitter.like }, { meta: { tokens }, timeout: 0 }) as TweetV2;
+                    if (!tweet) {
+                        throw new Error("Tweet does not exist!");
+                    } else if (oneDay < new Date(tweet.created_at!).getTime()) {
+                        throw new Error("Tweet cannot be older than 1 day!");
+                    }
+                }
+                if (twitter.retweet) {
+                    const tweet = await ctx.broker.call("v1.twitter.getTweetData", { postUrl: twitter.retweet }, { meta: { tokens }, timeout: 0 }) as TweetV2;
+                    if (!tweet) {
+                        throw new Error("Tweet does not exist!");
+                    } else if (oneDay < new Date(tweet.created_at!).getTime()) {
+                        throw new Error("Tweet cannot be older than 1 day!");
+                    }
+                }
+                if (twitter.wallet_post) {
+                    const tweet = await ctx.broker.call("v1.twitter.getTweetData", { postUrl: twitter.wallet_post }, { meta: { tokens }, timeout: 0 }) as TweetV2;
+                    if (!tweet) {
+                        throw new Error("Tweet does not exist!");
+                    } else if (oneDay < new Date(tweet.created_at!).getTime()) {
+                        throw new Error("Tweet cannot be older than 1 day!");
+                    }
+                }
+                
 
 				// Map the tx_hashes <array of strings> to transactions <array of objects>
 				ctx.params.transactions = tx_hashes?.map((hash: string) => ({hash, status: PAYMENT_STATUS.PENDING}));
+
 			}
 		},
 		after: {
@@ -230,15 +281,16 @@ const regex = {
 				return { result: true };
 			},
 		}
-    },
-    dependencies: [
+    }
+})
+class LotteryService extends MoleculerService {
+
+    dependencies: ServiceDependency[] = [
         { name: "tx", version: 1 }, 
 		{ name: "twitter", version: 1 },
         { name: "telegram", version: 1 }
-    ]
-})
-class LotteryService extends MoleculerService {
-    
+    ];
+
     @Method
     async handleTransactions(transactions: { hash: string, status: PAYMENT_STATUS }[], tokenType: "MATIC" | "ETH", lotteryEntity: ILottery.LotteryEntity): Promise<void> {
         const { _id,
@@ -414,7 +466,7 @@ class LotteryService extends MoleculerService {
                 let participants: string[] = [];
                 switch (key) {
                     case "like":
-                        if (await this.broker.call("v1.twitter.checkIfTweetExists", { postUrl: value }, { timeout: 0 })) {
+                        if (await this.broker.call("v1.twitter.getTweetData", { postUrl: value }, { timeout: 0 })) {
                             participants = await this.broker.call("v1.twitter.likedBy", { postUrl: value }, { timeout: 0 });
                         } else {
                             this.emergencyPayout(wallet, _id);
@@ -425,7 +477,7 @@ class LotteryService extends MoleculerService {
                         participants = await this.broker.call("v1.twitter.tweetedBy", { content: value, dateFrom: createdAt }, { timeout: 0 });
                         break;
                     case "retweet":
-                        if (await this.broker.call("v1.twitter.checkIfTweetExists", { postUrl: value }, { timeout: 0 })) {
+                        if (await this.broker.call("v1.twitter.getTweetData", { postUrl: value }, { timeout: 0 })) {
                             participants = await this.broker.call("v1.twitter.retweetedBy", { postUrl: value }, { timeout: 0 });
                         } else {
                             this.emergencyPayout(wallet, _id);
@@ -433,7 +485,7 @@ class LotteryService extends MoleculerService {
                         }
                         break;
                     case "follow":
-                        if (await this.broker.call("v1.twitter.checkIfUserExists", { userName: value }, { timeout: 0 })) {
+                        if (await this.broker.call("v1.twitter.getUserData", { userName: value }, { timeout: 0 })) {
                             participants = await this.broker.call("v1.twitter.followedBy", { userName: value }, { timeout: 0 });
                         } else {
                             this.emergencyPayout(wallet, _id);

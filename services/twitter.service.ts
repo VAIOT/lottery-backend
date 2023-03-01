@@ -112,8 +112,8 @@ class TwitterService extends MoleculerService {
 
 	@Action({ params: { tokens: "object" }, visibility: "protected" })
 	async getUserTokens(ctx: Context<{ tokens: ITwitter.TwitterInDto.savedTokens & ITwitter.TwitterInDto.userTokens }>): Promise<any> {
-		const { savedSecret, savedToken, userVerifier } = ctx.params.tokens;
-		return new Consumer({accessToken: savedToken, accessSecret: savedSecret}).getUserTokens(userVerifier);
+		const { savedSecret, userToken, userVerifier } = ctx.params.tokens;
+		return new Consumer({accessToken: userToken, accessSecret: savedSecret}).getUserTokens(userVerifier);
 	}
 
 

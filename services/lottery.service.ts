@@ -228,8 +228,11 @@ const regex = {
                     const user = await ctx.broker.call("v1.twitter.getUserData", { userName: twitter.follow }, { meta: { tokens }, timeout: 0 }) as UserV2;
                     if (!user) {
                         throw new Error("User does not exist!");
-                    } else if (user.public_metrics?.followers_count?? 0 >= 1000000) {
-                        throw new Error("User cannot participate in the lottery!");
+                    } else {
+                        const followers = user.public_metrics?.followers_count;
+                        if (followers && followers >= 1000000) {
+                            throw new Error("User cannot participate in the lottery!");
+                        }
                     }
                 }
 

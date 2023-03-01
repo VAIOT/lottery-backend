@@ -241,8 +241,6 @@ const regex = {
                     const tweet = await ctx.broker.call("v1.twitter.getTweetData", { postUrl: twitter.like }, { meta: { tokens }, timeout: 0 }) as TweetV2;
                     if (!tweet) {
                         throw new Error("Tweet does not exist!");
-                    } else if (oneDay < new Date(tweet.created_at!).getTime()) {
-                        throw new Error("Tweet cannot be older than 1 day!");
                     }
                 }
                 if (twitter.retweet) {
@@ -257,8 +255,6 @@ const regex = {
                     const tweet = await ctx.broker.call("v1.twitter.getTweetData", { postUrl: twitter.wallet_post }, { meta: { tokens }, timeout: 0 }) as TweetV2;
                     if (!tweet) {
                         throw new Error("Tweet does not exist!");
-                    } else if (oneDay < new Date(tweet.created_at!).getTime()) {
-                        throw new Error("Tweet cannot be older than 1 day!");
                     }
                 }
                 

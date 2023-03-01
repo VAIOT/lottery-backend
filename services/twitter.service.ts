@@ -77,7 +77,7 @@ class TwitterService extends MoleculerService {
 	}
 
 	@Action({ params: { postUrl: "string" }, visibility: "protected" })
-	async getTweetData(ctx: Context<ITwitter.TwitterInDto.post, ITwitter.TwitterInDto.meta>): Promise<TweetV2 | null> {
+	async getTweetData(ctx: Context<ITwitter.TwitterInDto.post, { tokens: ITwitter.TwitterInDto.accessTokens }>): Promise<TweetV2 | null> {
 		const { postUrl } = ctx.params;
 		const { tokens } = ctx.meta;
 		try {
@@ -89,7 +89,7 @@ class TwitterService extends MoleculerService {
 	}
 
 	@Action({ params: { userName: "string" }, visibility: "protected" })
-	async getUserData(ctx: Context<ITwitter.TwitterInDto.user, ITwitter.TwitterInDto.meta>): Promise<UserV2 | null> {
+	async getUserData(ctx: Context<ITwitter.TwitterInDto.user, { tokens: ITwitter.TwitterInDto.accessTokens }>): Promise<UserV2 | null> {
 		const { userName } = ctx.params;
 		const { tokens } = ctx.meta;
 		try {
@@ -111,7 +111,7 @@ class TwitterService extends MoleculerService {
 	}
 
 	@Action({ params: { tokens: "object" }, visibility: "protected" })
-	async getUserTokens(ctx: Context<{ tokens: ITwitter.TwitterInDto.tokens }>): Promise<any> {
+	async getUserTokens(ctx: Context<{ tokens: ITwitter.TwitterInDto.savedTokens & ITwitter.TwitterInDto.userTokens }>): Promise<any> {
 		const { savedSecret, savedToken, userVerifier } = ctx.params.tokens;
 		return new Consumer({accessToken: savedToken, accessSecret: savedSecret}).getUserTokens(userVerifier);
 	}
@@ -184,14 +184,14 @@ class TwitterService extends MoleculerService {
     }
 
 	@Method
-	async getTweetDataMethod(tweetId: string, tokens?: ITwitter.TwitterInDto.tokens): Promise<TweetV2> {
+	async getTweetDataMethod(tweetId: string, tokens?: ITwitter.TwitterInDto.accessTokens): Promise<TweetV2> {
 		return tokens
 		? (await apiV2.getTweetData(tweetId)).data
 		: (await new Consumer(tokens).getTweetData(tweetId)).data
 	}
 	
 	@Method
-	async getUserDataMethod(userName: string, tokens?: ITwitter.TwitterInDto.tokens): Promise<UserV2> {
+	async getUserDataMethod(userName: string, tokens?: ITwitter.TwitterInDto.accessTokens): Promise<UserV2> {
 		return tokens
 		? (await apiV2.getUserData(userName)).data
 		: (await new Consumer(tokens).getUserData(userName)).data

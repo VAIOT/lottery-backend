@@ -13,13 +13,18 @@ export namespace ITwitter {
 			content: string;
 			dateFrom: Date;
 		}
-		export type tokens = {
+		export type userTokens = {
 			userVerifier: string;
 			userToken: string;
+		}
+		export type savedTokens = {
 			savedToken: string;
 			savedSecret: string;
 		}
-		export type meta = { tokens: tokens }
+		export type accessTokens = {
+			accessToken: string;
+			accessSecret: string;
+		}
 	}
 	export namespace TwitterOutDto {
 		export type comment = {

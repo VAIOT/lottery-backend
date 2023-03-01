@@ -186,15 +186,15 @@ class TwitterService extends MoleculerService {
 	@Method
 	async getTweetDataMethod(tweetId: string, tokens?: ITwitter.TwitterInDto.accessTokens): Promise<TweetV2> {
 		return tokens
-		? (await apiV2.getTweetData(tweetId)).data
-		: (await new Consumer(tokens).getTweetData(tweetId)).data
+		? (await new Consumer(tokens).getTweetData(tweetId)).data
+		: (await apiV2.getTweetData(tweetId)).data
 	}
 	
 	@Method
 	async getUserDataMethod(userName: string, tokens?: ITwitter.TwitterInDto.accessTokens): Promise<UserV2> {
 		return tokens
-		? (await apiV2.getUserData(userName)).data
-		: (await new Consumer(tokens).getUserData(userName)).data
+		? (await new Consumer(tokens).getUserData(userName)).data
+		: (await apiV2.getUserData(userName)).data
 	}
 
 	started(): void {}

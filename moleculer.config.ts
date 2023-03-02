@@ -30,7 +30,7 @@ const brokerConfig: BrokerOptions = {
 	// Namespace of nodes to segment your nodes on the same network.
 	namespace: "development",
 	// Unique node identifier. Must be unique in a namespace.
-	nodeID: "vaiot-lottery",
+	nodeID: null,
 	// Custom metadata store. Store here what you want. Accessing: `this.broker.metadata`
 	metadata: {},
 
@@ -64,7 +64,7 @@ const brokerConfig: BrokerOptions = {
 		options: {
 			port: 6000
 		}
-	}, // "TCP"
+	},
 
 	// Define a cacher.
 	// More info: https://moleculer.services/docs/0.14/caching.html

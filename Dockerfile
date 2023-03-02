@@ -28,4 +28,4 @@ ENV NODE_ENV=production
 RUN npm ci --omit=dev
 
 # Start server
-CMD ["node", "./node_modules/moleculer/bin/moleculer-runner.js"]
+CMD ["npm", "start"]

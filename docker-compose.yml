@@ -2,26 +2,42 @@ version: "3.3"
 
 services:
 
-
-  social:
-    build:
-      context: .
-    image: vaiot-lottery-service
-    env_file: docker-compose.env
-    environment:
-      SERVICES: social
-    networks:
-      -  vaiot-api-gateway_internal
-
   lottery:
     build:
       context: .
     image: vaiot-lottery-service
-    env_file: docker-compose.env
+    env_file: 
+      - docker-compose.env
+      - .env
     environment:
       SERVICES: lottery
     depends_on:
-      - social
+      - twitter
+      - telegram
+    networks:
+      -  vaiot-api-gateway_internal
+
+  twitter:
+    build:
+      context: .
+    image: vaiot-lottery-service
+    env_file: 
+      - docker-compose.env
+      - .env
+    environment:
+      SERVICES: twitter
+    networks:
+      -  vaiot-api-gateway_internal
+
+  telegram:
+    build:
+      context: .
+    image: vaiot-lottery-service
+    env_file: 
+      - docker-compose.env
+      - .env
+    environment:
+      SERVICES: telegram
     networks:
       -  vaiot-api-gateway_internal
 

@@ -321,7 +321,7 @@ class LotteryService extends MoleculerService {
 
         if (allTransactionsSuccessful) {
             const data = {
-                lotteryType: distribution_method, // SPLIT OR PERCENTAGE
+                lotteryType: distribution_method,
                 author: wallet,
                 numOfWinners: num_of_winners, 
                 rewardAmounts: distribution_options,
@@ -384,9 +384,13 @@ class LotteryService extends MoleculerService {
                     this.logger.debug(`Found ${participants.length} participants in db.`);
                 } else {
                     // Get all participants
+                    this.logger.debug(`Getting participants.`);
                     const newParticipants = await this.getParticipants(endedLottery);
 
+                    // If got error
                     if (!newParticipants) {
+                        this.deactivateLottery(endedLottery._id);
+                        await this.emergencyCashback(endedLottery._id, endedLottery.lottery_id, endedLottery.asset_choice);
                         continue;
                     }
                     participants = newParticipants;
@@ -398,12 +402,11 @@ class LotteryService extends MoleculerService {
                 }
 
                 if (participants.length < endedLottery.num_of_winners) {
-                    this.logger.debug(`Participants.length < num_of_winners. Lottery ${endedLottery._id} deactivated.`);
+                    this.logger.debug(`Participants.length < num_of_winners. Lottery #${endedLottery._id} deactivated.`);
                     this.deactivateLottery(endedLottery._id);
-                    const transactions = endedLottery.transactions.map(({hash}) => ({ hash, status: PAYMENT_STATUS.STUCK }));
 
-                    this.logger.debug(`Change statuses of all transactions to 'STUCK'.`);
-                    this.adapter.updateById(endedLottery._id, { transactions }).exec();
+                    await this.emergencyCashback(endedLottery._id, endedLottery.lottery_id, endedLottery.asset_choice);
+                    this.logger.debug(`Lottery #${endedLottery._id} emergency payout done.`);
 
                     this.sendTelegramMessage(`Too few participants in the lottery #${lotteryId} asset: ${endedLottery.asset_choice}`);
                 }
@@ -457,6 +460,8 @@ class LotteryService extends MoleculerService {
                 // Log ended lottery ID
                 this.logger.debug(`Lottery ended! Id: ${endedLottery._id}.`);
             }
+        } else {
+            this.logger.debug(`No ended lotteries found; Waiting 15mins.`);
         }
 
         // Call after 15 mins // twitter rate limiting
@@ -465,11 +470,13 @@ class LotteryService extends MoleculerService {
 
     @Method
     async getParticipants(endedLottery: ILottery.LotteryEntity) {
-        const { createdAt, twitter, _id } = endedLottery;
+        const { createdAt, twitter } = endedLottery;
         const { wallet_post, ...reqs } = twitter;
         const twitterRequirements = Object.entries(reqs);
 
+        this.logger.debug(`Getting baseParticipants`);
         let baseParticipants: { text: string; author_id: string; }[] = await this.broker.call("v1.twitter.comments", { postUrl: wallet_post }, { timeout: 0 });
+        this.logger.debug(`Got ${baseParticipants}`);
 
         if (baseParticipants) {
             for await (const [key, value] of twitterRequirements) {
@@ -481,8 +488,6 @@ class LotteryService extends MoleculerService {
                         if (await this.broker.call("v1.twitter.getTweetData", { postUrl: value }, { timeout: 0 })) {
                             participants = await this.broker.call("v1.twitter.likedBy", { postUrl: value }, { timeout: 0 });
                         } else {
-                            this.deactivateLottery(_id);
-                            this.emergencyPayout(_id);
                             return null;
                         }
                         break;
@@ -493,8 +498,6 @@ class LotteryService extends MoleculerService {
                         if (await this.broker.call("v1.twitter.getTweetData", { postUrl: value }, { timeout: 0 })) {
                             participants = await this.broker.call("v1.twitter.retweetedBy", { postUrl: value }, { timeout: 0 });
                         } else {
-                            this.deactivateLottery(_id);
-                            this.emergencyPayout(_id);
                             return null;
                         }
                         break;
@@ -502,20 +505,20 @@ class LotteryService extends MoleculerService {
                         if (await this.broker.call("v1.twitter.getUserData", { userName: value }, { timeout: 0 })) {
                             participants = await this.broker.call("v1.twitter.followedBy", { userName: value }, { timeout: 0 });
                         } else {
-                            this.deactivateLottery(_id);
-                            this.emergencyPayout(_id);
                             return null;
                         }
                         break;
                     default:
-                        this.logger.error(`Unknown key ${key}`);
+                        this.logger.error(`Unknown key ${key}.`);
                 }
 
                 // Keep users who meet requirements
+                this.logger.debug(`Filtering users - ${key}.`);
                 baseParticipants = baseParticipants.filter((comment: any) =>
                     participants.some((id) => comment.author_id === id)
                 );
             }
+            
             // Keep users who posted wallet
             this.logger.debug('Fetching wallets from comments.');
             baseParticipants = baseParticipants.map(({text, author_id}) => ({ author_id, text: text.match(regex.wallet)?.[0] ?? ''}));
@@ -528,18 +531,26 @@ class LotteryService extends MoleculerService {
         return baseParticipants;
     }
 
+    // Sends a Telegram message
     @Method
     sendTelegramMessage(message: string) {
         this.broker.call("v1.telegram.sendMessage", { message }, { timeout: 0 })
-        .then(res => this.logger.debug(`Telegram message sent!`))
+        .then(res => {
+            this.logger.debug(`Sending telegram message!`)
+        })
         .catch(this.logger.error);
     }
 
     @Method
-    emergencyPayout(_id: string) {
-        // TODO 
+    async emergencyCashback(_id: string, lotteryId: number, asset_choice: TOKEN_TYPE) {
+        if (asset_choice === TOKEN_TYPE.MATIC) {
+            await this.broker.call("v1.matic.emergencyCashback", { lotteryId }, { timeout: 0 });
+        } else {
+            await this.broker.call("v1.erc.emergencyCashback", { _id }, { timeout: 0 });
+        }
     }
     
+    // Start scanning
 	started(): void {
         void this.findAndStartLotteries();
     }

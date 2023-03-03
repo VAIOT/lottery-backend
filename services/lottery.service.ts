@@ -378,6 +378,7 @@ class LotteryService extends MoleculerService {
 
             for await (const endedLottery of endedLotteries) {
                 let { participants } = (await this.actions.find({ query: { _id: endedLottery._id } }))[0] as { participants: {author_id: string, text: string }[] };
+                const lotteryId = endedLottery.lottery_id;
 
                 if (participants?.length > 0) {
                     this.logger.debug(`Found ${participants.length} participants in db.`);
@@ -395,12 +396,22 @@ class LotteryService extends MoleculerService {
 
                     this.logger.debug(`Saved ${participants.length} participants to db.`);
                 }
+
+                if (participants.length < endedLottery.num_of_winners) {
+                    this.logger.debug(`Participants.length < num_of_winners. Lottery ${endedLottery._id} deactivated.`);
+                    this.deactivateLottery(endedLottery._id);
+                    const transactions = endedLottery.transactions.map(({hash}) => ({ hash, status: PAYMENT_STATUS.STUCK }));
+
+                    this.logger.debug(`Change statuses of all transactions to 'STUCK'.`);
+                    this.adapter.updateById(endedLottery._id, { transactions }).exec();
+
+                    this.sendTelegramMessage(`Too few participants in the lottery #${lotteryId} asset: ${endedLottery.asset_choice}`);
+                }
                 
                 if (process.env.NODE_ENV === "production") {
 
                     const serviceName = (endedLottery.asset_choice === TOKEN_TYPE.MATIC ? 'matic' : 'erc').toLowerCase();
 
-                    const lotteryId = endedLottery.lottery_id;
                     const lotteryExists = await this.checkIfLotteryExists(serviceName, lotteryId);
 
                     if (!lotteryExists) {
@@ -433,7 +444,11 @@ class LotteryService extends MoleculerService {
 
                     const winningWallets: string[] = await this.broker.call(`v1.${ serviceName }.getWinnersOfLottery`, { lotteryId }, { timeout: 0 });
                 
-                    this.sendTelegramMessage(winningWallets, endedLottery.asset_choice, lotteryId);
+                    const message = winningWallets.length > 0
+                    ? `Winning wallets in the lottery #${lotteryId} asset: ${endedLottery.asset_choice} are: ${winningWallets.join(', ')}`
+                    : `Lottery #${lotteryId} asset: ${endedLottery.asset_choice} ended with no winners; No participants.`;
+
+                    this.sendTelegramMessage(message);
                 }
 
                 // Set the lottery's active state to false
@@ -514,13 +529,8 @@ class LotteryService extends MoleculerService {
     }
 
     @Method
-    sendTelegramMessage( winningWallets: string[], lotteryAsset: string, lotteryId: number) {
-        
-        const lotteryMessage = winningWallets.length > 0
-        ? `Winning wallets in lottery #${lotteryId} asset: ${lotteryAsset} are: ${winningWallets.join(', ')}`
-        : `Lottery #${lotteryId} asset: ${lotteryAsset} ended with no winners; No participants.`;
-
-        this.broker.call("v1.telegram.sendMessage", { message: lotteryMessage }, { timeout: 0 })
+    sendTelegramMessage(message: string) {
+        this.broker.call("v1.telegram.sendMessage", { message }, { timeout: 0 })
         .then(res => this.logger.debug(`Telegram message sent!`))
         .catch(this.logger.error);
     }

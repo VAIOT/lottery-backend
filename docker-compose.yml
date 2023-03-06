@@ -3,6 +3,7 @@ version: "3.3"
 services:
 
   lottery:
+    platform: linux/amd64
     build:
       context: .
     image: vaiot-lottery-service
@@ -18,6 +19,7 @@ services:
       -  vaiot-api-gateway_internal
 
   twitter:
+    platform: linux/amd64
     build:
       context: .
     image: vaiot-lottery-service
@@ -30,6 +32,7 @@ services:
       -  vaiot-api-gateway_internal
 
   telegram:
+    platform: linux/amd64
     build:
       context: .
     image: vaiot-lottery-service

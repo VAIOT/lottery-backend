@@ -5,7 +5,7 @@ import { model, Schema } from "mongoose";
 
 type LotterySettings = IERC20 &
 	IERC721 &
-	IMATIC & { twitter: TwitterDto; lottery_end: Date; active: boolean, createdAt: Date, updatedAt: Date };
+	IMATIC & { twitter: TwitterDto; lottery_end: Date; active: boolean, createdAt: Date, updatedAt: Date, fees_collected: boolean };
 	
 
 const lotterySchema = new Schema<LotterySettings>(
@@ -40,6 +40,10 @@ const lotterySchema = new Schema<LotterySettings>(
 		fees_amount: {
 			type: String,
 		},
+		fees_collected: {
+			type: Boolean,
+			default: false,
+		},
 		wallet: {
 			type: String,
 			required: true,
@@ -47,7 +51,7 @@ const lotterySchema = new Schema<LotterySettings>(
 		final_rewards: {
 			type: [String],
 			required: false,
-			default: undefined
+			default: undefined,
 		},
 		num_of_winners: {
 			type: Number,

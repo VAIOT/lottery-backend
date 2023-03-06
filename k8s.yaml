@@ -9,149 +9,88 @@ data:
   NAMESPACE: ""
   LOGLEVEL: info
   SERVICEDIR: services
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  MONGO_URI: mongodb://mongo/vaiot-lottery-service
-
-
 ---
 #########################################################
-# Greeter service
+# Lottery service
 #########################################################
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: greeter
+  name: lottery
 spec:
   selector:
     matchLabels:
-      app: greeter
-  replicas: 2
-  template:
-    metadata:
-      labels:
-        app: greeter
-    spec:
-      containers:
-      - name: greeter
-        image: vaiot-lottery-service
-        imagePullPolicy: IfNotPresent
-        envFrom:
-        - configMapRef:
-            name: common-env
-        env:
-          - name: SERVICES
-            value: greeter
-
----
-#########################################################
-# Products service
-#########################################################
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: products
-spec:
-  selector:
-    matchLabels:
-      app: products
-  replicas: 2
-  template:
-    metadata:
-      labels:
-        app: products
-    spec:
-      containers:
-      - name: products
-        image: vaiot-lottery-service
-        imagePullPolicy: IfNotPresent
-        envFrom:
-        - configMapRef:
-            name: common-env
-        env:
-          - name: SERVICES
-            value: products
-
----
-#########################################################
-# MongoDB server
-#########################################################
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: mongo
-  labels:
-    app: mongo
-spec:
-  selector:
-    matchLabels:
-      app: mongo
+      app: lottery
   replicas: 1
-  serviceName: mongo
   template:
     metadata:
       labels:
-        app: mongo
+        app: lottery
     spec:
       containers:
-        - image: mongo
-          name: mongo
-          ports:
-            - containerPort: 27017
-          resources: {}
-          volumeMounts:
-            - mountPath: /data/db
-              name: mongo-data
-      volumes:
-        - name: mongo-data
-          persistentVolumeClaim:
-            claimName: mongo-data
+      - name: lottery
+        image: vaiotcr.azurecr.io/vaiot-lottery-service:latest
+        imagePullPolicy: Always
+        envFrom:
+        - configMapRef:
+            name: common-env
+        env:
+          - name: SERVICES
+            value: lottery
 
 ---
 #########################################################
-# Persistent volume for MongoDB
+# Twitter service
 #########################################################
-apiVersion: v1
-kind: PersistentVolumeClaim
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: mongo-data
-  labels:
-    name: mongo-data
+  name: twitter
 spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 100Mi
-
----
-#########################################################
-# MongoDB service
-#########################################################
-apiVersion: v1
-kind: Service
-metadata:
-  name: mongo
-  labels:
-    app: mongo
-spec:
-  ports:
-    - port: 27017
-      targetPort: 27017
   selector:
-    app: mongo          
-
-
-
-
-
-
-
-
+    matchLabels:
+      app: twitter
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: twitter
+    spec:
+      containers:
+      - name: twitter
+        image: vaiotcr.azurecr.io/vaiot-lottery-service:latest
+        imagePullPolicy: Always
+        envFrom:
+        - configMapRef:
+            name: common-env
+        env:
+          - name: SERVICES
+            value: twitter
+---
+#########################################################
+# Telegram service
+#########################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telegram
+spec:
+  selector:
+    matchLabels:
+      app: telegram
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: telegram
+    spec:
+      containers:
+      - name: telegram
+        image: vaiotcr.azurecr.io/vaiot-lottery-service:latest
+        imagePullPolicy: Always
+        envFrom:
+        - configMapRef:
+            name: common-env
+        env:
+          - name: SERVICES
+            value: telegram

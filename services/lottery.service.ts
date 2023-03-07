@@ -31,13 +31,14 @@ const regex = {
     version: 1,
 	mixins: [DbService],
     adapter: new MongooseAdapter(`mongodb+srv://${process.env.MONGO_URI}`, {
+        dbName: process.env.MONGO_DB_NAME,
 		user: process.env.MONGO_USER,
 		pass: process.env.MONGO_PASS,
 		keepAlive: true,
 	}),
     model: lottery,
     entityValidator: {
-        duration: { type: "number", integer: true, positive: true },
+        duration: { type: "number", integer: true, positive: true, max: 168 },
         oauth_token: { type: "string" },
         oauth_verifier: { type: "string" },
         distribution_method: {
@@ -221,44 +222,45 @@ const regex = {
                     savedSecret: ctx.meta.session.oauthSecret
                 }
 
-                const tokens = await ctx.broker.call("v1.twitter.getUserTokens", { tokens: tokensDto }, { timeout: 0 });
-                ctx.meta.session.accessTokens = tokens as object;
+                if (process.env.NODE_ENV !== "development") {
+                    const tokens = await ctx.broker.call("v1.twitter.getUserTokens", { tokens: tokensDto }, { timeout: 0 });
+                    ctx.meta.session.accessTokens = tokens as object;
 
-                if (twitter.follow) {
-                    const user = await ctx.broker.call("v1.twitter.getUserData", { userName: twitter.follow }, { meta: { tokens }, timeout: 0 }) as UserV2;
-                    if (!user) {
-                        throw new Error("User does not exist!");
-                    } else {
-                        const followers = user.public_metrics?.followers_count;
-                        if (followers && followers >= 1000000) {
-                            throw new Error("User cannot participate in the lottery!");
+                    if (twitter.follow) {
+                        const user = await ctx.broker.call("v1.twitter.getUserData", { userName: twitter.follow }, { meta: { tokens }, timeout: 0 }) as UserV2;
+                        if (!user) {
+                            throw new Error("User does not exist!");
+                        } else {
+                            const followers = user.public_metrics?.followers_count;
+                            if (followers && followers >= 1000000) {
+                                throw new Error("User cannot participate in the lottery!");
+                            }
+                        }
+                    }
+
+                    const oneDay = new Date().getTime() + (1 * 24 * 60 * 60 * 1000);
+                    if (twitter.like) {
+                        const tweet = await ctx.broker.call("v1.twitter.getTweetData", { postUrl: twitter.like }, { meta: { tokens }, timeout: 0 }) as TweetV2;
+                        if (!tweet) {
+                            throw new Error("Tweet does not exist!");
+                        }
+                    }
+                    if (twitter.retweet) {
+                        const tweet = await ctx.broker.call("v1.twitter.getTweetData", { postUrl: twitter.retweet }, { meta: { tokens }, timeout: 0 }) as TweetV2;
+                        if (!tweet) {
+                            throw new Error("Tweet does not exist!");
+                        } else if (oneDay < new Date(tweet.created_at!).getTime()) {
+                            throw new Error("Tweet cannot be older than 1 day!");
+                        }
+                    }
+                    if (twitter.wallet_post) {
+                        const tweet = await ctx.broker.call("v1.twitter.getTweetData", { postUrl: twitter.wallet_post }, { meta: { tokens }, timeout: 0 }) as TweetV2;
+                        if (!tweet) {
+                            throw new Error("Tweet does not exist!");
                         }
                     }
                 }
-
-                const oneDay = new Date().getTime() + (1 * 24 * 60 * 60 * 1000);
-                if (twitter.like) {
-                    const tweet = await ctx.broker.call("v1.twitter.getTweetData", { postUrl: twitter.like }, { meta: { tokens }, timeout: 0 }) as TweetV2;
-                    if (!tweet) {
-                        throw new Error("Tweet does not exist!");
-                    }
-                }
-                if (twitter.retweet) {
-                    const tweet = await ctx.broker.call("v1.twitter.getTweetData", { postUrl: twitter.retweet }, { meta: { tokens }, timeout: 0 }) as TweetV2;
-                    if (!tweet) {
-                        throw new Error("Tweet does not exist!");
-                    } else if (oneDay < new Date(tweet.created_at!).getTime()) {
-                        throw new Error("Tweet cannot be older than 1 day!");
-                    }
-                }
-                if (twitter.wallet_post) {
-                    const tweet = await ctx.broker.call("v1.twitter.getTweetData", { postUrl: twitter.wallet_post }, { meta: { tokens }, timeout: 0 }) as TweetV2;
-                    if (!tweet) {
-                        throw new Error("Tweet does not exist!");
-                    }
-                }
                 
-
 				// Map the tx_hashes <array of strings> to transactions <array of objects>
 				ctx.params.transactions = tx_hashes?.map((hash: string) => ({hash, status: PAYMENT_STATUS.PENDING}));
 

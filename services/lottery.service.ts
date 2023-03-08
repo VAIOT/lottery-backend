@@ -221,42 +221,44 @@ const regex = {
                     savedSecret: ctx.meta.session.oauthSecret
                 }
 
-                if (process.env.NODE_ENV !== "development") {
-                    const tokens = await ctx.broker.call("v1.twitter.getUserTokens", { tokens: tokensDto }, { timeout: 0 });
-                    ctx.meta.session.accessTokens = tokens as object;
+                const tokens = await ctx.broker.call("v1.twitter.getUserTokens", { tokens: tokensDto }, { timeout: 0 });
+                ctx.meta.session.accessTokens = tokens as object;
 
-                    if (twitter.follow) {
-                        const user = await ctx.broker.call("v1.twitter.getUserData", { userName: twitter.follow }, { meta: { tokens }, timeout: 0 }) as UserV2;
-                        if (!user) {
-                            throw new Error("User does not exist!");
-                        } else {
-                            const followers = user.public_metrics?.followers_count;
-                            if (followers && followers >= 1000000) {
-                                throw new Error("User cannot participate in the lottery!");
-                            }
+                if (twitter.follow) {
+                    const user = await ctx.broker.call("v1.twitter.getUserData", { userName: twitter.follow }, { meta: { tokens }, timeout: 0 }) as UserV2;
+                    if (!user) {
+                        throw new Error("User does not exist!");
+                    } else {
+                        const followers = user.public_metrics?.followers_count;
+                        if (followers && followers >= 1000000) {
+                            throw new Error("User cannot participate in the lottery!");
                         }
                     }
+                }
 
-                    const oneDay = new Date().getTime() + (1 * 24 * 60 * 60 * 1000);
-                    if (twitter.like) {
-                        const tweet = await ctx.broker.call("v1.twitter.getTweetData", { postUrl: twitter.like }, { meta: { tokens }, timeout: 0 }) as TweetV2;
-                        if (!tweet) {
-                            throw new Error("Tweet does not exist!");
-                        }
+                const oneDay = new Date().getTime() + (1 * 24 * 60 * 60 * 1000);
+                if (twitter.like) {
+                    const tweet = await ctx.broker.call("v1.twitter.getTweetData", { postUrl: twitter.like }, { meta: { tokens }, timeout: 0 }) as TweetV2;
+                    if (!tweet) {
+                        throw new Error("Tweet does not exist!");
+                    } else if (oneDay < new Date(tweet.created_at!).getTime()) {
+                        throw new Error("Tweet cannot be older than 1 day!");
                     }
-                    if (twitter.retweet) {
-                        const tweet = await ctx.broker.call("v1.twitter.getTweetData", { postUrl: twitter.retweet }, { meta: { tokens }, timeout: 0 }) as TweetV2;
-                        if (!tweet) {
-                            throw new Error("Tweet does not exist!");
-                        } else if (oneDay < new Date(tweet.created_at!).getTime()) {
-                            throw new Error("Tweet cannot be older than 1 day!");
-                        }
+                }
+                if (twitter.retweet) {
+                    const tweet = await ctx.broker.call("v1.twitter.getTweetData", { postUrl: twitter.retweet }, { meta: { tokens }, timeout: 0 }) as TweetV2;
+                    if (!tweet) {
+                        throw new Error("Tweet does not exist!");
+                    } else if (oneDay < new Date(tweet.created_at!).getTime()) {
+                        throw new Error("Tweet cannot be older than 1 day!");
                     }
-                    if (twitter.wallet_post) {
-                        const tweet = await ctx.broker.call("v1.twitter.getTweetData", { postUrl: twitter.wallet_post }, { meta: { tokens }, timeout: 0 }) as TweetV2;
-                        if (!tweet) {
-                            throw new Error("Tweet does not exist!");
-                        }
+                }
+                if (twitter.wallet_post) {
+                    const tweet = await ctx.broker.call("v1.twitter.getTweetData", { postUrl: twitter.wallet_post }, { meta: { tokens }, timeout: 0 }) as TweetV2;
+                    if (!tweet) {
+                        throw new Error("Tweet does not exist!");
+                    } else if (oneDay < new Date(tweet.created_at!).getTime()) {
+                        throw new Error("Tweet cannot be older than 1 day!");
                     }
                 }
                 
@@ -273,11 +275,10 @@ const regex = {
 
 				ctx.service?.logger.info(`New lottery #${_id} created!`);
 
-				if (process.env.NODE_ENV === "production") {
-					const tokenType = (asset_choice === TOKEN_TYPE.MATIC ? 'MATIC' : 'ETH');
+                const tokenType = (asset_choice === TOKEN_TYPE.MATIC ? 'MATIC' : 'ETH');
 
-					ctx.service?.handleTransactions(transactions, tokenType, lotteryEntity);
-				}
+                ctx.service?.handleTransactions(transactions, tokenType, lotteryEntity);
+
 				return { result: true };
 			},
 		}
@@ -342,9 +343,6 @@ class LotteryService extends MoleculerService {
 
     @Method
     async checkIfLotteryExists(serviceName: string, lotteryId: number) {
-        if (process.env.NODE_ENV === "development") {
-            return true;
-        }
         return this.broker.call(`v1.${ serviceName }.checkIfLotteryExists`, { lotteryId });
     }
 
@@ -378,8 +376,25 @@ class LotteryService extends MoleculerService {
             this.logger.debug(`Found ${endedLotteries.length} ended lotteries.`);
 
             for await (const endedLottery of endedLotteries) {
+                // Get participants
                 let { participants } = (await this.actions.find({ query: { _id: endedLottery._id } }))[0] as { participants: {author_id: string, text: string }[] };
+                // Get service name for service calls
+                const serviceName = (endedLottery.asset_choice === TOKEN_TYPE.MATIC ? 'matic' : 'erc').toLowerCase();
+
                 const lotteryId = endedLottery.lottery_id;
+                const lotteryExists = await this.checkIfLotteryExists(serviceName, lotteryId);
+
+                // Check if lottery exists
+                if (!lotteryExists) {
+                    this.logger.debug(`Lottery doesn't exists. Lottery #${endedLottery._id} deactivated.`);
+                    this.deactivateLottery(endedLottery._id);
+
+                    await this.emergencyCashback(endedLottery._id, endedLottery.lottery_id, endedLottery.asset_choice);
+                    this.logger.debug(`Lottery #${endedLottery._id} emergency payout done.`);
+
+                    this.logger.error(`Lottery ${endedLottery._id} does not exist in ${serviceName} service!`);
+                    continue;
+                }
 
                 if (participants?.length > 0) {
                     this.logger.debug(`Found ${participants.length} participants in db.`);
@@ -409,57 +424,46 @@ class LotteryService extends MoleculerService {
                     await this.emergencyCashback(endedLottery._id, endedLottery.lottery_id, endedLottery.asset_choice);
                     this.logger.debug(`Lottery #${endedLottery._id} emergency payout done.`);
 
-                    this.sendTelegramMessage(`Too few participants in the lottery #${lotteryId} asset: ${endedLottery.asset_choice}`);
+                    this.sendTelegramMessage(`Too few participants in the lottery #${lotteryId} asset: ${endedLottery.asset_choice}.`);
+                    continue;
                 }
                 
-                if (process.env.NODE_ENV === "production") {
+                // call services to pick winner(s)
+                const addParticipantsResponse: { status: string, value: string } = await this.broker.call(`v1.${ serviceName }.addParticipants`, { lotteryId, participants: participants.map(({text}) => text) }, { timeout: 0 });
+                this.logger.debug('Participants added!');
 
-                    const serviceName = (endedLottery.asset_choice === TOKEN_TYPE.MATIC ? 'matic' : 'erc').toLowerCase();
-
-                    const lotteryExists = await this.checkIfLotteryExists(serviceName, lotteryId);
-
-                    if (!lotteryExists) {
-                        this.logger.error(`Lottery ${endedLottery._id} does not exist in ${serviceName} service!`);
-                        continue;
-                    }
-                    
-                    // call services to pick winner(s)
-                    const addParticipantsResponse: { status: string, value: string } = await this.broker.call(`v1.${ serviceName }.addParticipants`, { lotteryId, participants: participants.map(({text}) => text) }, { timeout: 0 });
-                    this.logger.debug('Participants added!');
-
-                    if (addParticipantsResponse.status !== "OK") {
-                        this.deactivateLottery(endedLottery._id);
-                        continue;
-                    }
-                    await sleep(15000);
-
-                    const pickRandomNumberResponse: { status: string, value: string | number } = await this.broker.call(`v1.${ serviceName }.pickRandomNumber`, { lotteryId }, { timeout: 0 });
-                    this.logger.debug('Picked random number!');
-
-                    if (pickRandomNumberResponse.status !== "OK") {
-                        this.deactivateLottery(endedLottery._id);
-                        continue;
-                    }
-                    await sleep(40000);
-
-                    await this.broker.call(`v1.${ serviceName }.payoutWinners`, { lotteryId, _id: endedLottery._id }, { timeout: 0 });
-
-                    await sleep(5000);
-
-                    const winningWallets: string[] = await this.broker.call(`v1.${ serviceName }.getWinnersOfLottery`, { lotteryId }, { timeout: 0 });
-                
-                    const message = winningWallets.length > 0
-                    ? `Winning wallets in the lottery #${lotteryId} asset: ${endedLottery.asset_choice} are: ${winningWallets.join(', ')}`
-                    : `Lottery #${lotteryId} asset: ${endedLottery.asset_choice} ended with no winners; No participants.`;
-
-                    this.sendTelegramMessage(message);
+                if (addParticipantsResponse.status !== "OK") {
+                    this.deactivateLottery(endedLottery._id);
+                    continue;
                 }
+                await sleep(15000);
+
+                const pickRandomNumberResponse: { status: string, value: string | number } = await this.broker.call(`v1.${ serviceName }.pickRandomNumber`, { lotteryId }, { timeout: 0 });
+                this.logger.debug('Picked random number!');
+
+                if (pickRandomNumberResponse.status !== "OK") {
+                    this.deactivateLottery(endedLottery._id);
+                    continue;
+                }
+                await sleep(40000);
+
+                await this.broker.call(`v1.${ serviceName }.payoutWinners`, { lotteryId, _id: endedLottery._id }, { timeout: 0 });
+
+                await sleep(5000);
+
+                const winningWallets: string[] = await this.broker.call(`v1.${ serviceName }.getWinnersOfLottery`, { lotteryId }, { timeout: 0 });
+            
+                const message = winningWallets.length > 0
+                ? `Winning wallets in the lottery #${lotteryId} asset: ${endedLottery.asset_choice} are: ${winningWallets.join(', ')}`
+                : `Lottery #${lotteryId} asset: ${endedLottery.asset_choice} ended with no winners; No participants.`;
+
+                this.sendTelegramMessage(message);
 
                 // Set the lottery's active state to false
                 this.deactivateLottery(endedLottery._id);
 
                 // Log ended lottery ID
-                this.logger.debug(`Lottery ended! Id: ${endedLottery._id}.`);
+                this.logger.debug(`Lottery ended successfully! Id: ${endedLottery._id}.`);
             }
         } else {
             this.logger.debug(`No ended lotteries found; Waiting 15mins.`);

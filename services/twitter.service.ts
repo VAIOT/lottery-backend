@@ -15,7 +15,7 @@ events.defaultMaxListeners = 100;
 })
 class TwitterService extends MoleculerService {
 
-	@Action({ params: { postUrl: "string" }, visibility: "protected" })
+	@Action({ params: { postUrl: "string" }, visibility: "public" })
 	async likedBy(ctx: Context<ITwitter.TwitterInDto.post>): Promise<string[] | null> {
 		const { postUrl } = ctx.params;
 		try {
@@ -26,7 +26,7 @@ class TwitterService extends MoleculerService {
 		}
 	}
 
-	@Action({ params: { postUrl: "string" }, visibility: "protected" })
+	@Action({ params: { postUrl: "string" }, visibility: "public" })
 	async retweetedBy(ctx: Context<ITwitter.TwitterInDto.post>): Promise<string[] | null> {
 		const { postUrl } = ctx.params;
 		try {
@@ -37,7 +37,7 @@ class TwitterService extends MoleculerService {
 		}
 	}
 
-	@Action({ params: { userName: "string" }, visibility: "protected" })
+	@Action({ params: { userName: "string" }, visibility: "public" })
 	async followedBy(ctx: Context<ITwitter.TwitterInDto.user>): Promise<string[] | null> {
 		const { userName } = ctx.params;
 		try {
@@ -48,7 +48,7 @@ class TwitterService extends MoleculerService {
 		}
 	}
 
-	@Action({ params: { content: "string", dateFrom: "date" }, visibility: "protected" })
+	@Action({ params: { content: "string", dateFrom: "date" }, visibility: "public" })
 	async tweetedBy(ctx: Context<ITwitter.TwitterInDto.search>): Promise<string[] | null> {
 		const { content, dateFrom } = ctx.params;
 		try {
@@ -59,7 +59,7 @@ class TwitterService extends MoleculerService {
 		}
 	}
 
-	@Action({ params: { postUrl: "string" }, visibility: "protected" })
+	@Action({ params: { postUrl: "string" }, visibility: "public" })
 	async comments(ctx: Context<ITwitter.TwitterInDto.post>): Promise<ITwitter.TwitterOutDto.comment[] | null> {
 		const { postUrl } = ctx.params;
 		try {
@@ -70,13 +70,13 @@ class TwitterService extends MoleculerService {
 		}
 	}
 
-	@Action({ params: { users: "array" }, visibility: "protected" })
+	@Action({ params: { users: "array" }, visibility: "public" })
 	async filterBots(ctx: Context<ITwitter.TwitterInDto.users>): Promise<string[]> {
 		const { users } = ctx.params;
 		return this.filterBotsMethod(users);
 	}
 
-	@Action({ params: { postUrl: "string" }, visibility: "protected" })
+	@Action({ params: { postUrl: "string" }, visibility: "public" })
 	async getTweetData(ctx: Context<ITwitter.TwitterInDto.post, { tokens: ITwitter.TwitterInDto.accessTokens }>): Promise<TweetV2 | null> {
 		const { postUrl } = ctx.params;
 		const { tokens } = ctx.meta;
@@ -88,7 +88,7 @@ class TwitterService extends MoleculerService {
 		}
 	}
 
-	@Action({ params: { userName: "string" }, visibility: "protected" })
+	@Action({ params: { userName: "string" }, visibility: "public" })
 	async getUserData(ctx: Context<ITwitter.TwitterInDto.user, { tokens: ITwitter.TwitterInDto.accessTokens }>): Promise<UserV2 | null> {
 		const { userName } = ctx.params;
 		const { tokens } = ctx.meta;
@@ -110,7 +110,7 @@ class TwitterService extends MoleculerService {
 		return { authLink: link.url };
 	}
 
-	@Action({ params: { tokens: "object" }, visibility: "protected" })
+	@Action({ params: { tokens: "object" }, visibility: "public" })
 	async getUserTokens(ctx: Context<{ tokens: ITwitter.TwitterInDto.savedTokens & ITwitter.TwitterInDto.userTokens }>): Promise<any> {
 		const { savedSecret, userToken, userVerifier } = ctx.params.tokens;
 		return new Consumer({accessToken: userToken, accessSecret: savedSecret}).getUserTokens(userVerifier);

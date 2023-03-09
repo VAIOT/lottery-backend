@@ -8,14 +8,14 @@
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 /* eslint-disable @typescript-eslint/naming-convention */
 import { lottery } from '@Entities/lottery';
-import { ILottery } from '@Interfaces/index';
+import { ILottery, TwitterDto } from '@Interfaces/index';
 import { sleep } from '@Meta';
 import { ERC20_TYPE, PAYMENT_STATUS, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from '@Meta/enums';
-import type { Context, ServiceDependency} from 'moleculer';
-import { Service as MoleculerService } from 'moleculer';
+import type { ServiceDependency} from 'moleculer';
+import { Context , Service as MoleculerService} from 'moleculer';
 import DbService from "moleculer-db";
 import MongooseAdapter from "moleculer-db-adapter-mongoose";
-import { Method, Service } from 'moleculer-decorators';
+import { Action, Method, Service } from 'moleculer-decorators';
 import type { TweetV2, UserV2 } from 'twitter-api-v2';
 
 const regex = {
@@ -38,8 +38,6 @@ const regex = {
     model: lottery,
     entityValidator: {
         duration: { type: "number", integer: true, positive: true, max: 168 },
-        oauth_token: { type: "string" },
-        oauth_verifier: { type: "string" },
         distribution_method: {
             type: "enum",
             values: Object.values(TOKEN_DISTRIBUTION_METHOD),
@@ -212,17 +210,9 @@ const regex = {
     hooks: {
         before: {
 			async create(ctx: Context<ILottery.LotteryDTO, {session: {[x: string]: string|object}}>) {
-				const { tx_hashes, twitter, oauth_token, oauth_verifier } = ctx.params;
-
-                const tokensDto = {
-                    userVerifier: oauth_verifier,
-                    userToken: oauth_token,
-                    savedToken: ctx.meta.session.oauthToken,
-                    savedSecret: ctx.meta.session.oauthSecret
-                }
-
-                const tokens = await ctx.broker.call("v1.twitter.getUserTokens", { tokens: tokensDto }, { timeout: 0 });
-                ctx.meta.session.accessTokens = tokens as object;
+				const { tx_hashes, twitter } = ctx.params;
+                const tokens = ctx.meta.session.accessTokens;
+                console.log({gotTokens: tokens})
 
                 if (twitter.follow) {
                     const user = await ctx.broker.call("v1.twitter.getUserData", { userName: twitter.follow }, { meta: { tokens }, timeout: 0 }) as UserV2;
@@ -236,28 +226,26 @@ const regex = {
                     }
                 }
 
-                const oneDay = new Date().getTime() + (1 * 24 * 60 * 60 * 1000);
+                const oneDay = new Date().setHours(new Date().getHours() - 24);
                 if (twitter.like) {
                     const tweet = await ctx.broker.call("v1.twitter.getTweetData", { postUrl: twitter.like }, { meta: { tokens }, timeout: 0 }) as TweetV2;
                     if (!tweet) {
                         throw new Error("Tweet does not exist!");
-                    } else if (oneDay < new Date(tweet.created_at!).getTime()) {
-                        throw new Error("Tweet cannot be older than 1 day!");
                     }
                 }
                 if (twitter.retweet) {
                     const tweet = await ctx.broker.call("v1.twitter.getTweetData", { postUrl: twitter.retweet }, { meta: { tokens }, timeout: 0 }) as TweetV2;
                     if (!tweet) {
                         throw new Error("Tweet does not exist!");
-                    } else if (oneDay < new Date(tweet.created_at!).getTime()) {
-                        throw new Error("Tweet cannot be older than 1 day!");
                     }
                 }
                 if (twitter.wallet_post) {
                     const tweet = await ctx.broker.call("v1.twitter.getTweetData", { postUrl: twitter.wallet_post }, { meta: { tokens }, timeout: 0 }) as TweetV2;
                     if (!tweet) {
                         throw new Error("Tweet does not exist!");
-                    } else if (oneDay < new Date(tweet.created_at!).getTime()) {
+                    } 
+                    console.log({oneDay, dateNow: Date.parse(tweet.created_at!)})
+                    if (oneDay > Date.parse(tweet.created_at!)) {
                         throw new Error("Tweet cannot be older than 1 day!");
                     }
                 }
@@ -291,6 +279,107 @@ class LotteryService extends MoleculerService {
 		{ name: "twitter", version: 1 },
         { name: "telegram", version: 1 }
     ];
+
+    @Action({
+        rest: { 
+            method: "POST", 
+            path: "/setUserTokens" 
+        },
+        params: { 
+            oauth_token: "string", 
+            oauth_verifier: "string" 
+        },
+        visibility: "published"
+    })
+    async setUserTokens(ctx: Context<{oauth_token: string, oauth_verifier: string}, {session: {[x: string]: string|object}}>) {
+        const { oauth_token, oauth_verifier } = ctx.params;
+
+        const tokensDto = {
+            userVerifier: oauth_verifier,
+            userToken: oauth_token,
+            savedToken: ctx.meta.session.oauthToken,
+            savedSecret: ctx.meta.session.oauthSecret
+        }
+        const tokens = await this.broker.call("v1.twitter.getUserTokens", { tokens: tokensDto }, { timeout: 0 });
+        console.log({tokens})
+
+        ctx.meta.session.accessTokens = tokens as object;
+        console.log({setTokens: ctx.meta.session.accessTokens})
+
+        return { status: "OK" }
+    }
+
+    @Action({
+        rest: { 
+            method: "POST", 
+            path: "/twitterRequirementsCheck" 
+        },
+        params: { 
+            twitter_requirements: "object",
+        },
+        visibility: "published" 
+    })
+	async twitterRequirementsCheck(ctx: Context<{twitter_requirements: TwitterDto}, {session: {accessTokens:{accessToken: string; accessSecret: string;}}}>): Promise<any> {
+		const { twitter_requirements } = ctx.params;
+        const tokens = ctx.meta.session.accessTokens;
+        console.log({tokens})
+        
+		try {
+			return await this.twitterRequirementsCheckMethod(twitter_requirements, tokens);
+		} catch(e) {
+			this.logger.error(e);
+			return null;
+		}
+	}
+
+    @Method
+    async twitterRequirementsCheckMethod(twitterRequirements: TwitterDto, tokens: { accessToken: string; accessSecret: string; }): Promise<{field: string, error: string} | null> {
+
+        console.log({twitterRequirements})
+        if (twitterRequirements.follow) {
+            console.log(twitterRequirements.follow);
+            const user = await this.broker.call("v1.twitter.getUserData", { userName: twitterRequirements.follow }, { meta: { tokens }, timeout: 0 }) as UserV2;
+            console.log({user})
+            if (!user) {
+                return { field: "follow", error: "USER_NOT_EXIST" };
+            }
+            const followers = user.public_metrics?.followers_count;
+            if (followers && followers >= 1000000) {
+                return { field: "follow", error: "USER_BLACKLISTED" };
+            }
+        }
+
+        const oneDay = new Date().setHours(new Date().getHours() - 24);
+        if (twitterRequirements.like) {
+            console.log(twitterRequirements.like);
+            const tweet = await this.broker.call("v1.twitter.getTweetData", { postUrl: twitterRequirements.like }, { meta: { tokens }, timeout: 0 }) as TweetV2;
+            console.log({tweet})
+            if (!tweet) {
+                return { field: "like", error: "TWEET_NOT_EXIST" };
+            }
+        }
+        if (twitterRequirements.retweet) {
+            console.log(twitterRequirements.retweet);
+            const tweet = await this.broker.call("v1.twitter.getTweetData", { postUrl: twitterRequirements.retweet }, { meta: { tokens }, timeout: 0 }) as TweetV2;
+            console.log({tweet})
+            if (!tweet) {
+                return { field: "retweet", error: "TWEET_NOT_EXIST" };
+            }
+        }
+        if (twitterRequirements.wallet_post) {
+            console.log(twitterRequirements.wallet_post);
+            const tweet = await this.broker.call("v1.twitter.getTweetData", { postUrl: twitterRequirements.wallet_post }, { meta: { tokens }, timeout: 0 }) as TweetV2;
+            console.log({tweet})
+            if (!tweet) {
+                return { field: "wallet_post", error: "TWEET_NOT_EXIST" };
+            }
+            console.log({oneDay, dateNow: Date.parse(tweet.created_at!)})
+            if (oneDay > Date.parse(tweet.created_at!)) {
+                return { field: "wallet_post", error: "TWEET_OVER_1_DAY" };
+            }
+        }
+        return null;
+    }
 
     @Method
     async handleTransactions(transactions: { hash: string, status: PAYMENT_STATUS }[], tokenType: "MATIC" | "ETH", lotteryEntity: ILottery.LotteryEntity): Promise<void> {

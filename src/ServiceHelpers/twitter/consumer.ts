@@ -27,6 +27,6 @@ export class Consumer {
 	}
 
     async getTweetData(tweetId: string): Promise<TweetV2SingleResult> {
-        return this.api.v2.singleTweet(tweetId, { "tweet.fields" : ["author_id", "conversation_id"] });
+        return this.api.v2.singleTweet(tweetId, { "tweet.fields" : ["author_id", "conversation_id", 'created_at'] });
     }
 }

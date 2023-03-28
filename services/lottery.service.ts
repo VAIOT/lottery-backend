@@ -262,6 +262,7 @@ const regex = {
 					transactions } = lotteryEntity;
 
 				ctx.service?.logger.info(`New lottery #${_id} created!`);
+                ctx.service?.sendTelegramMessage(`New lottery #${_id} asset: ${asset_choice}, has been created!`)
 
                 const tokenType = (asset_choice === TOKEN_TYPE.MATIC ? 'MATIC' : 'ETH');
 
@@ -300,6 +301,7 @@ class LotteryService extends MoleculerService {
             savedToken: ctx.meta.session.oauthToken,
             savedSecret: ctx.meta.session.oauthSecret
         }
+        
         const tokens = await this.broker.call("v1.twitter.getUserTokens", { tokens: tokensDto }, { timeout: 0 });
         console.log({tokens})
 

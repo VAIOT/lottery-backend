@@ -57,7 +57,7 @@
     "nats": "^2.13.1",
     "superagent": "^8.0.9",
     "tsconfig-paths": "^3.14.2",
-    "twitter-api-v2": "^1.14.1"
+    "twitter-api-v2": "^1.14.2"
   },
   "engines": {
     "node": ">= 16.x.x"

@@ -1,5 +1,3 @@
-/* eslint-disable no-await-in-loop */
-/* eslint-disable @typescript-eslint/naming-convention */
 import type { TweetLikingUsersV2Paginator, TweetRetweetersUsersV2Paginator, TweetSearchRecentV2Paginator, TweetV2SingleResult, UserV2Result } from "twitter-api-v2";
 import BaseApi from "./baseApi";
 

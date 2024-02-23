@@ -1,7 +1,3 @@
-/* eslint-disable no-promise-executor-return */
-/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
-/* eslint-disable no-await-in-loop */
-/* eslint-disable no-continue */
 import { ApiResponseError, TwitterApi } from "twitter-api-v2";
 
 export default class {

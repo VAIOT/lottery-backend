@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/naming-convention */
-/* eslint-disable no-continue */
 import events from "events";
 import { ITwitter } from "@Interfaces";
 import { apiV1, apiV2, botometer, Consumer, getPostId } from '@ServiceHelpers';
@@ -16,7 +14,7 @@ events.defaultMaxListeners = 100;
 class TwitterService extends MoleculerService {
 
 	@Action({ params: { postUrl: "string" }, visibility: "public" })
-	async likedBy(ctx: Context<ITwitter.TwitterInDto.post>): Promise<string[] | null> {
+	async likedBy(ctx: Context<ITwitter.In.post>): Promise<string[] | null> {
 		const { postUrl } = ctx.params;
 		try {
 			return await this.getTweetLikesMethod(postUrl);
@@ -27,7 +25,7 @@ class TwitterService extends MoleculerService {
 	}
 
 	@Action({ params: { postUrl: "string" }, visibility: "public" })
-	async retweetedBy(ctx: Context<ITwitter.TwitterInDto.post>): Promise<string[] | null> {
+	async retweetedBy(ctx: Context<ITwitter.In.post>): Promise<string[] | null> {
 		const { postUrl } = ctx.params;
 		try {
 			return await this.getTweetRetweetsMethod(postUrl);
@@ -38,7 +36,7 @@ class TwitterService extends MoleculerService {
 	}
 
 	@Action({ params: { userName: "string" }, visibility: "public" })
-	async followedBy(ctx: Context<ITwitter.TwitterInDto.user>): Promise<string[] | null> {
+	async followedBy(ctx: Context<ITwitter.In.user>): Promise<string[] | null> {
 		const { userName } = ctx.params;
 		try {
 			return await this.getUserFollowersMethod(userName);
@@ -49,7 +47,7 @@ class TwitterService extends MoleculerService {
 	}
 
 	@Action({ params: { content: "string", dateFrom: "date" }, visibility: "public" })
-	async tweetedBy(ctx: Context<ITwitter.TwitterInDto.search>): Promise<string[] | null> {
+	async tweetedBy(ctx: Context<ITwitter.In.search>): Promise<string[] | null> {
 		const { content, dateFrom } = ctx.params;
 		try {
 			return await this.searchTweetsMethod(content, dateFrom);
@@ -60,7 +58,7 @@ class TwitterService extends MoleculerService {
 	}
 
 	@Action({ params: { postUrl: "string" }, visibility: "public" })
-	async comments(ctx: Context<ITwitter.TwitterInDto.post>): Promise<ITwitter.TwitterOutDto.comment[] | null> {
+	async comments(ctx: Context<ITwitter.In.post>): Promise<ITwitter.Out.comment[] | null> {
 		const { postUrl } = ctx.params;
 		try {
 			return await this.getTweetCommentsMethod(postUrl, true, true);
@@ -71,13 +69,13 @@ class TwitterService extends MoleculerService {
 	}
 
 	@Action({ params: { users: "array" }, visibility: "public" })
-	async filterBots(ctx: Context<ITwitter.TwitterInDto.users>): Promise<string[]> {
+	async filterBots(ctx: Context<ITwitter.In.users>): Promise<string[]> {
 		const { users } = ctx.params;
 		return this.filterBotsMethod(users);
 	}
 
 	@Action({ params: { postUrl: "string" }, visibility: "public" })
-	async getTweetData(ctx: Context<ITwitter.TwitterInDto.post, { tokens: ITwitter.TwitterInDto.accessTokens }>): Promise<TweetV2 | null> {
+	async getTweetData(ctx: Context<ITwitter.In.post, { tokens: ITwitter.In.accessTokens }>): Promise<TweetV2 | null> {
 		const { postUrl } = ctx.params;
 		const { tokens } = ctx.meta;
 		try {
@@ -89,7 +87,7 @@ class TwitterService extends MoleculerService {
 	}
 
 	@Action({ params: { userName: "string" }, visibility: "public" })
-	async getUserData(ctx: Context<ITwitter.TwitterInDto.user, { tokens: ITwitter.TwitterInDto.accessTokens }>): Promise<UserV2 | null> {
+	async getUserData(ctx: Context<ITwitter.In.user, { tokens: ITwitter.In.accessTokens }>): Promise<UserV2 | null> {
 		const { userName } = ctx.params;
 		const { tokens } = ctx.meta;
 		try {
@@ -111,7 +109,7 @@ class TwitterService extends MoleculerService {
 	}
 
 	@Action({ params: { tokens: "object" }, visibility: "public" })
-	async getUserTokens(ctx: Context<{ tokens: ITwitter.TwitterInDto.savedTokens & ITwitter.TwitterInDto.userTokens }>): Promise<any> {
+	async getUserTokens(ctx: Context<{ tokens: ITwitter.In.savedTokens & ITwitter.In.userTokens }>): Promise<any> {
 		const { savedSecret, userToken, userVerifier } = ctx.params.tokens;
 		return new Consumer({accessToken: userToken, accessSecret: savedSecret}).getUserTokens(userVerifier);
 	}
@@ -184,14 +182,14 @@ class TwitterService extends MoleculerService {
     }
 
 	@Method
-	async getTweetDataMethod(tweetId: string, tokens?: ITwitter.TwitterInDto.accessTokens): Promise<TweetV2> {
+	async getTweetDataMethod(tweetId: string, tokens?: ITwitter.In.accessTokens): Promise<TweetV2> {
 		return tokens
 		? (await new Consumer(tokens).getTweetData(tweetId)).data
 		: (await apiV2.getTweetData(tweetId)).data
 	}
 	
 	@Method
-	async getUserDataMethod(userName: string, tokens?: ITwitter.TwitterInDto.accessTokens): Promise<UserV2> {
+	async getUserDataMethod(userName: string, tokens?: ITwitter.In.accessTokens): Promise<UserV2> {
 		return tokens
 		? (await new Consumer(tokens).getUserData(userName)).data
 		: (await apiV2.getUserData(userName)).data

@@ -1,5 +1,5 @@
 export namespace ITwitter {
-	export namespace TwitterInDto {
+	export namespace In {
 		export type post = {
 			postUrl: string;
 		}
@@ -26,7 +26,7 @@ export namespace ITwitter {
 			accessSecret: string;
 		}
 	}
-	export namespace TwitterOutDto {
+	export namespace Out {
 		export type comment = {
 			text: string;
 			author_id: string;

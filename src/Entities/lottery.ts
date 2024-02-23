@@ -1,4 +1,3 @@
-/* eslint-disable import/prefer-default-export */
 import type { IERC20, IERC721, IMATIC, TwitterDto } from "@Interfaces";
 import { ERC20_TYPE, PAYMENT_STATUS, TOKEN_DISTRIBUTION_METHOD, TOKEN_TYPE } from "@Meta";
 import { model, Schema } from "mongoose";
@@ -121,8 +120,7 @@ const lotterySchema = new Schema<LotterySettings>(
 );
 
 lotterySchema.pre("save", function(next) {
-	// const timezoneOffsetMS = new Date().getTime() + -new Date().getTimezoneOffset() * 60 * 1000;
-	// Set lottery end date
+	// Set end date
 	const lotteryEndMS = new Date().getTime() + this.duration * 60 * 60 * 1000;
 	this.lottery_end = new Date(lotteryEndMS);
 

@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit && echo \"tsc: no typecheck errors\"",
     "ci": "jest --watch",
     "test": "jest --coverage",
+    "test:e2e": "NODE_ENV=test TEST_E2E=true jest --config ./test/e2e/jest.config.ts",
     "lint": "cross-env TIMING=1 eslint . --ext cjs,mjs,js,jsx,ts,tsx",
     "lint:fix": "cross-env TIMING=1 eslint . --ext cjs,mjs,js,jsx,ts,tsx --fix",
     "prettier": "prettier . --ignore-unknown --check",

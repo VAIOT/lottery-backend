@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/no-loop-func */
-/* eslint-disable no-promise-executor-return */
-/* eslint-disable no-await-in-loop */
 import type { UserFollowerIdsV1Paginator } from "twitter-api-v2";
 import BaseApi from "./baseApi";
 

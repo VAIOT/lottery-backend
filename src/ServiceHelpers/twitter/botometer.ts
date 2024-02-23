@@ -1,13 +1,6 @@
 /**
  * source: https://github.com/andreyluiz/botometer/blob/master/src/index.ts
  */
-/* eslint-disable @typescript-eslint/no-shadow */
-/* eslint-disable import/no-extraneous-dependencies */
-/* eslint-disable no-await-in-loop */
-/* eslint-disable curly */
-/* eslint-disable no-console */
-/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import * as request from "superagent";
 import type { TwitterApiv1 } from "twitter-api-v2";
 import { TwitterApi } from "twitter-api-v2";

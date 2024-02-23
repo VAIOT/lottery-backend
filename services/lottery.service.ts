@@ -1,12 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
-/* eslint-disable no-param-reassign */
-/* eslint-disable no-void */
-/* eslint-disable no-await-in-loop */
-/* eslint-disable @typescript-eslint/no-misused-promises */
-/* eslint-disable no-continue */
-/* eslint-disable @typescript-eslint/no-implied-eval */
-/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
-/* eslint-disable @typescript-eslint/naming-convention */
 import { lottery } from '@Entities/lottery';
 import { ILottery, TwitterDto } from '@Interfaces/index';
 import { sleep } from '@Meta';
@@ -17,24 +8,19 @@ import DbService from "moleculer-db";
 import MongooseAdapter from "moleculer-db-adapter-mongoose";
 import { Action, Method, Service } from 'moleculer-decorators';
 import type { TweetV2, UserV2 } from 'twitter-api-v2';
+import * as rules from '@Validation/rules';
 
-const regex = {
-	twitter: {
-		post: "^(http(s)?:\\/\\/)?twitter\\.com\\/(?:#!\\/)?(\\w+)\\/status(es)?\\/(\\d+)$",
-		username: "^@(\\w{1,15})$"
-	},
-	wallet: /0x[a-fA-Z0-9]{40}/
-};
-
-@Service({ 
-	name: "lottery",
-    version: 1,
-	mixins: [DbService],
-    adapter: new MongooseAdapter(`mongodb+srv://${process.env.MONGO_URI}/${process.env.MONGO_DB_NAME}`, {
-		user: process.env.MONGO_USER,
-		pass: process.env.MONGO_PASS,
-		keepAlive: true,
-	}),
+@Service({
+    name: "lottery",
+	version: 1,
+    mixins: [DbService],
+    adapter: process.env.NODE_ENV === 'test' 
+        ? new DbService.MemoryAdapter() 
+        : new MongooseAdapter(`mongodb+srv://${process.env.MONGO_URI}/${process.env.MONGO_DB_NAME}`, {
+            user: process.env.MONGO_USER,
+            pass: process.env.MONGO_PASS,
+            keepAlive: true,
+	    }),
     model: lottery,
     entityValidator: {
         duration: { type: "number", integer: true, positive: true, max: 168 },
@@ -193,17 +179,17 @@ const regex = {
             props: {
                 like: {
                     type: "string",
-                    pattern: regex.twitter.post,
+                    pattern: rules.twitter.post,
                     optional: true,
                 },
                 content: { type: "string", min: 3, max: 280, optional: true },
                 retweet: {
                     type: "string",
-                    pattern: regex.twitter.post,
+                    pattern: rules.twitter.post,
                     optional: true,
                 },
-                follow: { type: "string", pattern: regex.twitter.username, optional: true },
-                wallet_post: { type: "string", pattern: regex.twitter.post, optional: false },
+                follow: { type: "string", pattern: rules.twitter.username, optional: true },
+                wallet_post: { type: "string", pattern: rules.twitter.post, optional: false },
             },
         },
     },
@@ -274,7 +260,6 @@ const regex = {
     }
 })
 class LotteryService extends MoleculerService {
-
     dependencies: ServiceDependency[] = [
         { name: "tx", version: 1 }, 
 		{ name: "twitter", version: 1 },
@@ -617,7 +602,7 @@ class LotteryService extends MoleculerService {
             
             // Keep users who posted wallet
             this.logger.debug('Fetching wallets from comments.');
-            baseParticipants = baseParticipants.map(({text, author_id}) => ({ author_id, text: text.match(regex.wallet)?.[0] ?? ''}));
+            baseParticipants = baseParticipants.map(({text, author_id}) => ({ author_id, text: text.match(rules.wallet)?.[0] ?? ''}));
 
             // Filter bots
             const filteredIds: string[] = await this.broker.call("v1.twitter.filterBots", { users: baseParticipants.map(({author_id}) => author_id) }, { timeout: 0 });
